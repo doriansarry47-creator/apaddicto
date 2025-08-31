@@ -3,15 +3,18 @@
   "buildCommand": "npm run vercel-build",
   "outputDirectory": "dist/public",
   "functions": {
-    "api/**/*.ts": {
+    "api/index.ts": {
       "runtime": "nodejs20.x"
     }
   },
   "rewrites": [
-    { "source": "/api/(.*)", "destination": "/api" },
-    { "source": "/((?!api).*)", "destination": "/" }
-  ],
-  "env": {
-    "NODE_ENV": "production"
-  }
+    { 
+      "source": "/api/(.*)", 
+      "destination": "/api/index" 
+    },
+    { 
+      "source": "/((?!api).*)", 
+      "destination": "/" 
+    }
+  ]
 }
