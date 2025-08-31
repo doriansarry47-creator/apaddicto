@@ -10,8 +10,5 @@
   "rewrites": [
     { "source": "/api/(.*)", "destination": "/api" },
     { "source": "/((?!api).*)", "destination": "/" }
-  ],
-  "env": {
-    "NODE_ENV": "production"
-  }
+  ]
 }
