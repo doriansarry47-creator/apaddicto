@@ -1,0 +1,80 @@
+1. Contexte et objectifs
+Les patients suivis en addictologie sont confrontés à des cravings, états d’envie intense qui augmentent le risque de rechute. L’application Move&Mind vise à :
+
+Offrir des outils rapides et efficaces pour réduire le craving par l’activité physique adaptée.
+
+Accompagner la gestion des émotions associées.
+
+Favoriser l’autonomie par la psychoéducation.
+
+Rendre l’expérience engageante et ludique afin d’encourager la régularité.
+
+2. Public cible
+Adultes suivis pour addiction (alcool, drogues, tabac, addictions comportementales).
+
+Profil varié en condition physique et aisance numérique.
+
+Utilisateurs de smartphones et tablettes (Android / iOS) et accès web.
+
+3. Fonctionnalités
+3.1. Suivi des cravings
+Enregistrement journalier avec : intensité (échelle 0–10), déclencheurs, émotions associées.
+
+Historique visuel (graphiques et courbes d’évolution).
+
+Corrélation entre craving, activité physique et émotion.
+
+3.2. Colonne de Beck intégrée
+Formulaire interactif avec 5 colonnes :
+
+Situation
+
+Pensées automatiques
+
+Émotions (échelle d’intensité)
+
+Réponses rationnelles
+
+Résultat / nouveau ressenti
+
+Sauvegarde et consultation ultérieure pour auto-analyse.
+
+3.3. Gestion des émotions
+Bibliothèque d’exercices de régulation émotionnelle :
+
+Respiration guidée (cohérence cardiaque, respiration carrée).
+
+Relaxation musculaire progressive.
+
+Visualisations positives.
+
+Notifications personnalisées en cas de pic émotionnel détecté via saisie craving.
+
+3.4. Activité physique adaptée
+Routines sans matériel, filtrées par :
+
+Intensité (douce, modérée, dynamique).
+
+Objectif (réduction craving, détente, regain d’énergie).
+
+Guidance vidéo/animation + minuteur intégré.
+
+Option « Routine express 3 minutes » pour cravings aigus.
+
+3.5. Psychoéducation
+Modules pédagogiques courts :
+
+Comment l’activité physique agit sur le craving.
+
+Comprendre le cycle craving → action → soulagement.
+
+Stratégies cognitives et émotionnelles complémentaires.
+
+Adaptation du contenu aux besoins (questionnaire initial).
+
+3.6. Gamification (approche ludique)
+Points et badges pour chaque séance complétée.
+
+Défis hebdomadaires (« 5 routines en 7 jours »).
+
+Niveaux à débloquer avec nouvelles activités.

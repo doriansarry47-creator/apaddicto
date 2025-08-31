@@ -1,0 +1,576 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Activité Physique Adaptée - Gestion des Cravings</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#1976D2',
+                        'primary-dark': '#1565C0',
+                        secondary: '#388E3C',
+                        'secondary-dark': '#2E7D32',
+                        success: '#4CAF50',
+                        warning: '#FF9800',
+                        error: '#F44336',
+                        surface: '#FFFFFF',
+                        background: '#FAFAFA'
+                    },
+                    fontFamily: {
+                        'roboto': ['Roboto', 'sans-serif']
+                    },
+                    boxShadow: {
+                        'material': '0 2px 4px rgba(0,0,0,0.1), 0 8px 16px rgba(0,0,0,0.1)',
+                        'material-lg': '0 4px 8px rgba(0,0,0,0.12), 0 12px 24px rgba(0,0,0,0.15)'
+                    }
+                }
+            }
+        };
+    </script>
+    <style>
+        .material-icons {
+            font-family: 'Material Icons';
+            font-weight: normal;
+            font-style: normal;
+            font-size: 24px;
+            line-height: 1;
+            letter-spacing: normal;
+            text-transform: none;
+            display: inline-block;
+            white-space: nowrap;
+            word-wrap: normal;
+            direction: ltr;
+            -webkit-font-feature-settings: 'liga';
+            -webkit-font-smoothing: antialiased;
+        }
+        .craving-slider {
+            background: linear-gradient(to right, #4CAF50 0%, #FF9800 50%, #F44336 100%);
+        }
+        .fab {
+            position: fixed;
+            bottom: 80px;
+            right: 20px;
+            z-index: 1000;
+        }
+        @media (min-width: 768px) {
+            .fab {
+                bottom: 20px;
+            }
+        }
+    </style>
+</head>
+<body class="font-roboto bg-background text-gray-800">
+    <!-- @COMPONENT: NavigationHeader -->
+    <header class="bg-surface shadow-material-lg sticky top-0 z-50">
+        <div class="container mx-auto px-4 py-4">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center space-x-3">
+                    <div class="w-10 h-10 bg-primary rounded-full flex items-center justify-center">
+                        <span class="material-icons text-white text-lg">fitness_center</span>
+                    </div>
+                    <div>
+                        <h1 class="text-xl font-medium text-gray-900">Activité Physique Adaptée</h1>
+                        <p class="text-sm text-gray-600">Gestion des cravings par le mouvement</p>
+                    </div>
+                </div>
+                <div class="flex items-center space-x-2">
+                    <button class="p-2 text-gray-600 hover:bg-gray-100 rounded-full transition-colors">
+                        <span class="material-icons">notifications</span>
+                    </button>
+                    <div class="w-8 h-8 bg-secondary rounded-full flex items-center justify-center">
+                        <span class="text-white text-sm font-medium" data-bind="user.initials">DS</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+    <!-- @END_COMPONENT: NavigationHeader -->
+
+    <!-- @COMPONENT: MainContent -->
+    <main class="container mx-auto px-4 py-6 pb-20 md:pb-6">
+        
+        <!-- Dashboard Overview Cards -->
+        <section class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+            <!-- Today's Craving Level -->
+            <div class="bg-surface rounded-xl shadow-material p-6">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-lg font-medium text-gray-900">Niveau de Craving Aujourd'hui</h3>
+                    <span class="material-icons text-primary">trending_down</span>
+                </div>
+                <div class="space-y-4">
+                    <div class="flex items-center justify-between">
+                        <span class="text-3xl font-bold text-gray-900" data-bind="craving.today">3</span>
+                        <span class="text-sm text-gray-600">/10</span>
+                    </div>
+                    <div class="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
+                        <div class="h-full craving-slider rounded-full" style="width: 30%"></div>
+                    </div>
+                    <p class="text-sm text-success font-medium">↓ 40% depuis hier</p>
+                </div>
+            </div>
+
+            <!-- Weekly Progress -->
+            <div class="bg-surface rounded-xl shadow-material p-6">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-lg font-medium text-gray-900">Progrès Cette Semaine</h3>
+                    <span class="material-icons text-secondary">bar_chart</span>
+                </div>
+                <div class="space-y-4">
+                    <div class="text-center">
+                        <div class="text-3xl font-bold text-secondary" data-bind="progress.exercises">12</div>
+                        <div class="text-sm text-gray-600">exercices complétés</div>
+                    </div>
+                    <div class="flex items-center justify-center space-x-2">
+                        <span class="material-icons text-warning text-lg">emoji_events</span>
+                        <span class="text-sm font-medium text-gray-900" data-bind="progress.badges">3 nouveaux badges</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Emergency Action -->
+            <div class="bg-gradient-to-br from-error to-red-600 rounded-xl shadow-material p-6 text-white">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-lg font-medium">Routine d'Urgence</h3>
+                    <span class="material-icons">emergency</span>
+                </div>
+                <p class="text-sm mb-4 opacity-90">Ressens-tu un craving intense maintenant?</p>
+                <button class="w-full bg-white text-error font-medium py-2 px-4 rounded-lg hover:bg-gray-50 transition-colors" data-event="click:startEmergencyRoutine">
+                    Démarrer Routine 3 min
+                </button>
+            </div>
+        </section>
+
+        <!-- Quick Craving Entry -->
+        <section class="bg-surface rounded-xl shadow-material p-6 mb-8">
+            <h3 class="text-lg font-medium text-gray-900 mb-4 flex items-center">
+                <span class="material-icons mr-2 text-primary">psychology</span>
+                Enregistrer un Craving
+            </h3>
+            
+            <!-- @STATE: cravingLevel:number = 5, selectedTriggers:array = [], selectedEmotions:array = [] -->
+            <div class="space-y-6">
+                <!-- Intensity Slider -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">
+                        Intensité du craving: <span class="font-bold text-primary" data-bind="cravingLevel">5</span>/10
+                    </label>
+                    <input type="range" min="0" max="10" value="5" class="w-full h-2 craving-slider rounded-lg appearance-none cursor-pointer" data-event="input:updateCravingLevel">
+                </div>
+
+                <!-- Triggers -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-3">Déclencheurs identifiés</label>
+                    <div class="flex flex-wrap gap-2">
+                        <!-- @MAP: triggers.map(trigger => ( -->
+                        <button class="px-3 py-1 text-sm border border-gray-300 rounded-full hover:bg-primary hover:text-white hover:border-primary transition-colors" data-mock="true">Stress</button>
+                        <button class="px-3 py-1 text-sm border border-gray-300 rounded-full hover:bg-primary hover:text-white hover:border-primary transition-colors" data-mock="true">Ennui</button>
+                        <button class="px-3 py-1 text-sm border border-gray-300 rounded-full hover:bg-primary hover:text-white hover:border-primary transition-colors" data-mock="true">Solitude</button>
+                        <button class="px-3 py-1 text-sm border border-gray-300 rounded-full hover:bg-primary hover:text-white hover:border-primary transition-colors" data-mock="true">Conflit</button>
+                        <button class="px-3 py-1 text-sm border border-gray-300 rounded-full hover:bg-primary hover:text-white hover:border-primary transition-colors" data-mock="true">Fatigue</button>
+                        <!-- @END_MAP )) -->
+                    </div>
+                </div>
+
+                <!-- Emotions -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-3">Émotions ressenties</label>
+                    <div class="flex flex-wrap gap-2">
+                        <!-- @MAP: emotions.map(emotion => ( -->
+                        <button class="px-3 py-1 text-sm border border-gray-300 rounded-full hover:bg-secondary hover:text-white hover:border-secondary transition-colors" data-mock="true">Anxiété</button>
+                        <button class="px-3 py-1 text-sm border border-gray-300 rounded-full hover:bg-secondary hover:text-white hover:border-secondary transition-colors" data-mock="true">Tristesse</button>
+                        <button class="px-3 py-1 text-sm border border-gray-300 rounded-full hover:bg-secondary hover:text-white hover:border-secondary transition-colors" data-mock="true">Colère</button>
+                        <button class="px-3 py-1 text-sm border border-gray-300 rounded-full hover:bg-secondary hover:text-white hover:border-secondary transition-colors" data-mock="true">Frustration</button>
+                        <!-- @END_MAP )) -->
+                    </div>
+                </div>
+
+                <button class="w-full bg-primary text-white font-medium py-3 rounded-lg hover:bg-primary-dark transition-colors" data-event="click:saveCraving">
+                    Enregistrer
+                </button>
+            </div>
+        </section>
+
+        <!-- Exercise Categories -->
+        <section class="mb-8">
+            <div class="flex items-center justify-between mb-6">
+                <h2 class="text-2xl font-medium text-gray-900">Exercices par Catégorie</h2>
+                <button class="text-primary hover:text-primary-dark font-medium" data-event="click:viewAllExercises">
+                    Voir tout
+                </button>
+            </div>
+
+            <!-- Category Tabs -->
+            <div class="flex space-x-1 bg-gray-100 rounded-xl p-1 mb-6 overflow-x-auto">
+                <button class="px-4 py-2 rounded-lg bg-primary text-white font-medium whitespace-nowrap" data-active="true">Réduction Craving</button>
+                <button class="px-4 py-2 rounded-lg text-gray-600 hover:bg-white hover:text-gray-900 transition-colors font-medium whitespace-nowrap">Détente</button>
+                <button class="px-4 py-2 rounded-lg text-gray-600 hover:bg-white hover:text-gray-900 transition-colors font-medium whitespace-nowrap">Regain d'Énergie</button>
+                <button class="px-4 py-2 rounded-lg text-gray-600 hover:bg-white hover:text-gray-900 transition-colors font-medium whitespace-nowrap">Gestion Émotions</button>
+            </div>
+
+            <!-- Exercise Cards Grid -->
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <!-- @MAP: exercises.map(exercise => ( -->
+                
+                <!-- Exercise Card 1: Beginner Level -->
+                <div class="bg-surface rounded-xl shadow-material overflow-hidden hover:shadow-material-lg transition-shadow">
+                    <!-- A person doing gentle stretching exercises in a peaceful indoor setting -->
+                    <img src="https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&h=200" alt="Gentle stretching exercise" class="w-full h-48 object-cover" data-mock-image="true" />
+                    <div class="p-5">
+                        <div class="flex items-center justify-between mb-2">
+                            <span class="px-2 py-1 bg-green-100 text-green-800 text-xs font-medium rounded-full">Débutant</span>
+                            <span class="text-sm text-gray-500">5 min</span>
+                        </div>
+                        <h4 class="text-lg font-medium text-gray-900 mb-2" data-mock="true">Étirements Doux Anti-Stress</h4>
+                        <p class="text-sm text-gray-600 mb-4" data-mock="true">Séquence d'étirements simples pour apaiser le système nerveux et réduire les tensions.</p>
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center text-sm text-gray-500">
+                                <span class="material-icons text-base mr-1">fitness_center</span>
+                                <span>Intensité douce</span>
+                            </div>
+                            <button class="bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary-dark transition-colors" data-event="click:startExercise">
+                                Démarrer
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Exercise Card 2: Intermediate Level -->
+                <div class="bg-surface rounded-xl shadow-material overflow-hidden hover:shadow-material-lg transition-shadow">
+                    <!-- A person doing moderate bodyweight exercises like squats in a home environment -->
+                    <img src="https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&h=200" alt="Bodyweight exercise routine" class="w-full h-48 object-cover" data-mock-image="true" />
+                    <div class="p-5">
+                        <div class="flex items-center justify-between mb-2">
+                            <span class="px-2 py-1 bg-yellow-100 text-yellow-800 text-xs font-medium rounded-full">Intermédiaire</span>
+                            <span class="text-sm text-gray-500">8 min</span>
+                        </div>
+                        <h4 class="text-lg font-medium text-gray-900 mb-2" data-mock="true">Circuit Cardio Doux</h4>
+                        <p class="text-sm text-gray-600 mb-4" data-mock="true">Enchaînement de mouvements pour activer la circulation et libérer les endorphines.</p>
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center text-sm text-gray-500">
+                                <span class="material-icons text-base mr-1">fitness_center</span>
+                                <span>Intensité modérée</span>
+                            </div>
+                            <button class="bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary-dark transition-colors" data-event="click:startExercise">
+                                Démarrer
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Exercise Card 3: Advanced Level -->
+                <div class="bg-surface rounded-xl shadow-material overflow-hidden hover:shadow-material-lg transition-shadow">
+                    <!-- A person doing dynamic fitness exercises with intensity in a modern workout space -->
+                    <img src="https://images.unsplash.com/photo-1571019614242-c5c5dee9f50b?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&h=200" alt="High intensity workout" class="w-full h-48 object-cover" data-mock-image="true" />
+                    <div class="p-5">
+                        <div class="flex items-center justify-between mb-2">
+                            <span class="px-2 py-1 bg-red-100 text-red-800 text-xs font-medium rounded-full">Avancé</span>
+                            <span class="text-sm text-gray-500">12 min</span>
+                        </div>
+                        <h4 class="text-lg font-medium text-gray-900 mb-2" data-mock="true">HIIT Anti-Craving</h4>
+                        <p class="text-sm text-gray-600 mb-4" data-mock="true">Entraînement intensif pour une libération maximale d'endorphines et réduction rapide du craving.</p>
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center text-sm text-gray-500">
+                                <span class="material-icons text-base mr-1">fitness_center</span>
+                                <span>Intensité dynamique</span>
+                            </div>
+                            <button class="bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary-dark transition-colors" data-event="click:startExercise">
+                                Démarrer
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Exercise Card 4: Breathing Exercises -->
+                <div class="bg-surface rounded-xl shadow-material overflow-hidden hover:shadow-material-lg transition-shadow">
+                    <!-- A serene meditation scene with a person in peaceful breathing pose -->
+                    <img src="https://images.unsplash.com/photo-1506126613408-eca07ce68773?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&h=200" alt="Breathing meditation exercise" class="w-full h-48 object-cover" data-mock-image="true" />
+                    <div class="p-5">
+                        <div class="flex items-center justify-between mb-2">
+                            <span class="px-2 py-1 bg-blue-100 text-blue-800 text-xs font-medium rounded-full">Tous niveaux</span>
+                            <span class="text-sm text-gray-500">6 min</span>
+                        </div>
+                        <h4 class="text-lg font-medium text-gray-900 mb-2" data-mock="true">Respiration Cohérence Cardiaque</h4>
+                        <p class="text-sm text-gray-600 mb-4" data-mock="true">Technique de respiration guidée pour réguler le système nerveux et réduire l'anxiété.</p>
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center text-sm text-gray-500">
+                                <span class="material-icons text-base mr-1">air</span>
+                                <span>Respiration</span>
+                            </div>
+                            <button class="bg-secondary text-white px-4 py-2 rounded-lg hover:bg-secondary-dark transition-colors" data-event="click:startBreathing">
+                                Démarrer
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Exercise Card 5: Yoga/Relaxation -->
+                <div class="bg-surface rounded-xl shadow-material overflow-hidden hover:shadow-material-lg transition-shadow">
+                    <!-- A peaceful yoga session with gentle poses in natural lighting -->
+                    <img src="https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&h=200" alt="Yoga relaxation poses" class="w-full h-48 object-cover" data-mock-image="true" />
+                    <div class="p-5">
+                        <div class="flex items-center justify-between mb-2">
+                            <span class="px-2 py-1 bg-purple-100 text-purple-800 text-xs font-medium rounded-full">Débutant+</span>
+                            <span class="text-sm text-gray-500">10 min</span>
+                        </div>
+                        <h4 class="text-lg font-medium text-gray-900 mb-2" data-mock="true">Yoga Relaxation Progressive</h4>
+                        <p class="text-sm text-gray-600 mb-4" data-mock="true">Enchaînement de postures douces pour la détente musculaire et mentale profonde.</p>
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center text-sm text-gray-500">
+                                <span class="material-icons text-base mr-1">self_improvement</span>
+                                <span>Relaxation</span>
+                            </div>
+                            <button class="bg-secondary text-white px-4 py-2 rounded-lg hover:bg-secondary-dark transition-colors" data-event="click:startYoga">
+                                Démarrer
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Exercise Card 6: Express Routine -->
+                <div class="bg-surface rounded-xl shadow-material overflow-hidden hover:shadow-material-lg transition-shadow border-2 border-error">
+                    <!-- Quick energetic movements in a compact indoor space -->
+                    <img src="https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&h=200" alt="Quick exercise routine" class="w-full h-48 object-cover" data-mock-image="true" />
+                    <div class="p-5">
+                        <div class="flex items-center justify-between mb-2">
+                            <span class="px-2 py-1 bg-red-100 text-red-800 text-xs font-medium rounded-full">Express</span>
+                            <span class="text-sm text-gray-500">3 min</span>
+                        </div>
+                        <h4 class="text-lg font-medium text-gray-900 mb-2" data-mock="true">Routine Urgence Anti-Craving</h4>
+                        <p class="text-sm text-gray-600 mb-4" data-mock="true">Séquence rapide et efficace pour casser immédiatement un pic de craving intense.</p>
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center text-sm text-gray-500">
+                                <span class="material-icons text-base mr-1">emergency</span>
+                                <span>Urgence</span>
+                            </div>
+                            <button class="bg-error text-white px-4 py-2 rounded-lg hover:bg-red-600 transition-colors" data-event="click:startEmergency">
+                                Démarrer
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <!-- @END_MAP )) -->
+            </div>
+        </section>
+
+        <!-- Beck Column Tool -->
+        <section class="bg-surface rounded-xl shadow-material p-6 mb-8">
+            <h3 class="text-xl font-medium text-gray-900 mb-2 flex items-center">
+                <span class="material-icons mr-2 text-primary">psychology</span>
+                Colonne de Beck - Analyse Cognitive
+            </h3>
+            <p class="text-sm text-gray-600 mb-6">Analysez vos pensées et émotions pour mieux comprendre vos réactions.</p>
+            
+            <div class="grid grid-cols-1 lg:grid-cols-5 gap-4">
+                <!-- Column 1: Situation -->
+                <div class="space-y-3">
+                    <label class="block text-sm font-medium text-gray-700">1. Situation</label>
+                    <textarea class="w-full p-3 border border-gray-300 rounded-lg resize-none h-24 text-sm" placeholder="Décrivez la situation déclenchante..." data-event="input:updateSituation"></textarea>
+                </div>
+
+                <!-- Column 2: Automatic Thoughts -->
+                <div class="space-y-3">
+                    <label class="block text-sm font-medium text-gray-700">2. Pensées Automatiques</label>
+                    <textarea class="w-full p-3 border border-gray-300 rounded-lg resize-none h-24 text-sm" placeholder="Quelles pensées vous sont venues spontanément?" data-event="input:updateThoughts"></textarea>
+                </div>
+
+                <!-- Column 3: Emotions -->
+                <div class="space-y-3">
+                    <label class="block text-sm font-medium text-gray-700">3. Émotions</label>
+                    <textarea class="w-full p-3 border border-gray-300 rounded-lg resize-none h-20 text-sm" placeholder="Quelles émotions avez-vous ressenties?" data-event="input:updateEmotions"></textarea>
+                    <div class="flex items-center space-x-2">
+                        <span class="text-xs text-gray-500">Intensité:</span>
+                        <input type="range" min="1" max="10" value="5" class="flex-1 h-1" data-event="input:updateEmotionIntensity">
+                        <span class="text-xs font-medium text-primary" data-bind="emotionIntensity">5</span>
+                    </div>
+                </div>
+
+                <!-- Column 4: Rational Responses -->
+                <div class="space-y-3">
+                    <label class="block text-sm font-medium text-gray-700">4. Réponses Rationnelles</label>
+                    <textarea class="w-full p-3 border border-gray-300 rounded-lg resize-none h-24 text-sm" placeholder="Quelle serait une pensée plus équilibrée?" data-event="input:updateRationalResponse"></textarea>
+                </div>
+
+                <!-- Column 5: Result -->
+                <div class="space-y-3">
+                    <label class="block text-sm font-medium text-gray-700">5. Nouveau Ressenti</label>
+                    <textarea class="w-full p-3 border border-gray-300 rounded-lg resize-none h-20 text-sm" placeholder="Comment vous sentez-vous maintenant?" data-event="input:updateNewFeeling"></textarea>
+                    <div class="flex items-center space-x-2">
+                        <span class="text-xs text-gray-500">Nouvelle intensité:</span>
+                        <input type="range" min="1" max="10" value="5" class="flex-1 h-1" data-event="input:updateNewIntensity">
+                        <span class="text-xs font-medium text-secondary" data-bind="newIntensity">5</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="flex justify-between mt-6">
+                <button class="text-gray-600 hover:text-gray-800 font-medium" data-event="click:clearBeckForm">
+                    Effacer
+                </button>
+                <button class="bg-primary text-white px-6 py-2 rounded-lg hover:bg-primary-dark transition-colors font-medium" data-event="click:saveBeckAnalysis">
+                    Sauvegarder l'Analyse
+                </button>
+            </div>
+        </section>
+
+        <!-- Gamification Progress -->
+        <section class="bg-surface rounded-xl shadow-material p-6">
+            <h3 class="text-xl font-medium text-gray-900 mb-4 flex items-center">
+                <span class="material-icons mr-2 text-warning">emoji_events</span>
+                Progression et Récompenses
+            </h3>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <!-- Level Progress -->
+                <div>
+                    <div class="flex items-center justify-between mb-3">
+                        <span class="text-sm font-medium text-gray-700">Niveau Actuel</span>
+                        <span class="text-sm text-gray-500" data-bind="level.current">Niveau 3</span>
+                    </div>
+                    <div class="w-full bg-gray-200 rounded-full h-3 mb-3">
+                        <div class="bg-gradient-to-r from-warning to-yellow-500 h-3 rounded-full" style="width: 65%" data-bind="level.progress"></div>
+                    </div>
+                    <p class="text-xs text-gray-600" data-bind="level.nextUnlock">Débloque "Méditation Avancée" au niveau 4</p>
+                </div>
+
+                <!-- Recent Badges -->
+                <div>
+                    <h4 class="text-sm font-medium text-gray-700 mb-3">Badges Récents</h4>
+                    <div class="flex space-x-2">
+                        <!-- @MAP: recentBadges.map(badge => ( -->
+                        <div class="flex flex-col items-center space-y-1" data-mock="true">
+                            <div class="w-10 h-10 bg-warning rounded-full flex items-center justify-center">
+                                <span class="material-icons text-white text-sm">star</span>
+                            </div>
+                            <span class="text-xs text-gray-600">7 jours</span>
+                        </div>
+                        <div class="flex flex-col items-center space-y-1" data-mock="true">
+                            <div class="w-10 h-10 bg-success rounded-full flex items-center justify-center">
+                                <span class="material-icons text-white text-sm">fitness_center</span>
+                            </div>
+                            <span class="text-xs text-gray-600">50 exercices</span>
+                        </div>
+                        <div class="flex flex-col items-center space-y-1" data-mock="true">
+                            <div class="w-10 h-10 bg-primary rounded-full flex items-center justify-center">
+                                <span class="material-icons text-white text-sm">trending_down</span>
+                            </div>
+                            <span class="text-xs text-gray-600">Moins de cravings</span>
+                        </div>
+                        <!-- @END_MAP )) -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Weekly Challenge -->
+            <div class="mt-6 p-4 bg-gradient-to-r from-secondary to-green-600 rounded-xl text-white">
+                <h4 class="font-medium mb-2">Défi de la Semaine</h4>
+                <p class="text-sm mb-3 opacity-90" data-bind="challenge.description">Complétez 5 exercices de respiration cette semaine</p>
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center space-x-2">
+                        <div class="w-full bg-white bg-opacity-30 rounded-full h-2" style="min-width: 120px;">
+                            <div class="bg-white h-2 rounded-full" style="width: 60%" data-bind="challenge.progress"></div>
+                        </div>
+                        <span class="text-sm font-medium" data-bind="challenge.count">3/5</span>
+                    </div>
+                    <div class="flex items-center text-sm">
+                        <span class="material-icons text-sm mr-1">emoji_events</span>
+                        <span data-bind="challenge.reward">50 pts</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+    <!-- @END_COMPONENT: MainContent -->
+
+    <!-- Floating Action Button for Emergency -->
+    <button class="fab bg-error text-white w-14 h-14 rounded-full shadow-material-lg hover:shadow-xl transition-all flex items-center justify-center" data-event="click:emergencyAction">
+        <span class="material-icons">emergency</span>
+    </button>
+
+    <!-- @COMPONENT: BottomNavigation -->
+    <nav class="md:hidden fixed bottom-0 left-0 right-0 bg-surface border-t border-gray-200 z-40">
+        <div class="grid grid-cols-5 h-16">
+            <button class="flex flex-col items-center justify-center space-y-1 text-primary" data-active="true">
+                <span class="material-icons text-lg">dashboard</span>
+                <span class="text-xs">Accueil</span>
+            </button>
+            <button class="flex flex-col items-center justify-center space-y-1 text-gray-600 hover:text-primary transition-colors" data-event="click:navigateToExercises">
+                <span class="material-icons text-lg">fitness_center</span>
+                <span class="text-xs">Exercices</span>
+            </button>
+            <button class="flex flex-col items-center justify-center space-y-1 text-gray-600 hover:text-primary transition-colors" data-event="click:navigateToTracking">
+                <span class="material-icons text-lg">analytics</span>
+                <span class="text-xs">Suivi</span>
+            </button>
+            <button class="flex flex-col items-center justify-center space-y-1 text-gray-600 hover:text-primary transition-colors" data-event="click:navigateToEducation">
+                <span class="material-icons text-lg">school</span>
+                <span class="text-xs">Éducation</span>
+            </button>
+            <button class="flex flex-col items-center justify-center space-y-1 text-gray-600 hover:text-primary transition-colors" data-event="click:navigateToProfile">
+                <span class="material-icons text-lg">person</span>
+                <span class="text-xs">Profil</span>
+            </button>
+        </div>
+    </nav>
+    <!-- @END_COMPONENT: BottomNavigation -->
+
+    <script>
+        (function() {
+            // TODO: Implement craving tracking functionality
+            // TODO: Implement exercise video/timer functionality
+            // TODO: Implement Beck column data persistence
+            // TODO: Implement gamification progress tracking
+            // TODO: Implement emergency routine quick access
+            // TODO: Implement offline mode for emergency exercises
+            
+            // Simple demo interactions for slider feedback
+            const cravingSlider = document.querySelector('input[type="range"]');
+            if (cravingSlider) {
+                cravingSlider.addEventListener('input', function() {
+                    const value = this.value;
+                    const display = document.querySelector('[data-bind="cravingLevel"]');
+                    if (display) {
+                        display.textContent = value;
+                    }
+                });
+            }
+
+            // Simple demo for category filtering
+            const categoryButtons = document.querySelectorAll('[data-active]');
+            categoryButtons.forEach(button => {
+                button.addEventListener('click', function() {
+                    // Remove active state from all buttons
+                    categoryButtons.forEach(btn => {
+                        btn.classList.remove('bg-primary', 'text-white');
+                        btn.classList.add('text-gray-600');
+                        btn.removeAttribute('data-active');
+                    });
+                    
+                    // Add active state to clicked button
+                    this.classList.add('bg-primary', 'text-white');
+                    this.classList.remove('text-gray-600');
+                    this.setAttribute('data-active', 'true');
+                    
+                    // TODO: Filter exercises based on selected category
+                });
+            });
+
+            // Emergency button pulse animation
+            const emergencyButton = document.querySelector('.fab');
+            if (emergencyButton) {
+                setInterval(() => {
+                    emergencyButton.style.transform = 'scale(1.1)';
+                    setTimeout(() => {
+                        emergencyButton.style.transform = 'scale(1)';
+                    }, 200);
+                }, 3000);
+            }
+        })();
+    </script>
+</body>
+</html>
