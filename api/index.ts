@@ -22,9 +22,10 @@ app.use(
     resave: false,
     saveUninitialized: false,
     cookie: {
-      secure: true, // Force HTTPS in production
+      secure: process.env.NODE_ENV === 'production', // Force HTTPS only in production
       httpOnly: true,
       maxAge: 1000 * 60 * 60 * 24 * 7, // 1 week
+      sameSite: 'lax', // CSRF protection
     },
   }),
 );
