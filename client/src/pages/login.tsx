@@ -1,218 +1,104 @@
-import { useState, useEffect } from "react";
+// pages/LoginPage.tsx
+import { useState } from "react";
 import { useLocation } from "wouter";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useToast } from "@/hooks/use-toast";
-import { useLoginMutation, useRegisterMutation, useAuthQuery } from "@/hooks/use-auth";
-import { Instagram } from "lucide-react";
+import { useAuth } from "../hooks/useAuth";
 
-export default function Login() {
+export default function LoginPage() {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [, setLocation] = useLocation();
-  const { toast } = useToast();
-  const { data: user, isLoading } = useAuthQuery();
+  const { login, isLoginLoading, loginError, user } = useAuth();
 
-  const [loginForm, setLoginForm] = useState({
-    email: "",
-    password: "",
-  });
+  // Redirection automatique si déjà connecté
+  if (user) {
+    setLocation("/dashboard");
+    return null;
+  }
 
-  const [registerForm, setRegisterForm] = useState({
-    email: "",
-    password: "",
-    firstName: "",
-    lastName: "",
-    role: "patient",
-  });
-
-  const loginMutation = useLoginMutation();
-  const registerMutation = useRegisterMutation();
-
-  // ✅ Redirection uniquement si l'utilisateur est connecté
-  useEffect(() => {
-    if (user && !isLoading) {
-      setLocation("/dashboard"); // change la route cible
-    }
-  }, [user, isLoading, setLocation]);
-
-  const handleLogin = async (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-
-    try {
-      await loginMutation.mutateAsync(loginForm);
-      toast({
-        title: "Connexion réussie",
-        description: "Bienvenue dans votre espace thérapeutique",
-      });
-    } catch (error) {
-      toast({
-        title: "Erreur de connexion",
-        description: error instanceof Error ? error.message : "Vérifiez vos identifiants",
-        variant: "destructive",
-      });
-    }
-  };
-
-  const handleRegister = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    try {
-      await registerMutation.mutateAsync(registerForm);
-      toast({
-        title: "Inscription réussie",
-        description: "Votre compte a été créé avec succès",
-      });
-    } catch (error) {
-      toast({
-        title: "Erreur d'inscription",
-        description: error instanceof Error ? error.message : "Vérifiez vos informations",
-        variant: "destructive",
-      });
-    }
+    login({ email, password }, {
+      onSuccess: () => {
+        // Redirection explicite vers le dashboard après login réussi
+        setLocation("/dashboard");
+      }
+    });
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
-      <div className="w-full max-w-md">
-        <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Apaddicto</h1>
-          <p className="text-gray-600">Votre parcours de bien-être commence ici</p>
+    <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className="max-w-md w-full space-y-8">
+        <div>
+          <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
+            🏃‍♂️ Apaddicto
+          </h2>
+          <p className="mt-2 text-center text-sm text-gray-600">
+            Connectez-vous à votre compte
+          </p>
         </div>
+        
+        <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
+          <div className="rounded-md shadow-sm -space-y-px">
+            <div>
+              <label htmlFor="email" className="sr-only">
+                Email
+              </label>
+              <input
+                id="email"
+                name="email"
+                type="email"
+                autoComplete="email"
+                required
+                className="relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-t-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
+                placeholder="Adresse email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+              />
+            </div>
+            <div>
+              <label htmlFor="password" className="sr-only">
+                Mot de passe
+              </label>
+              <input
+                id="password"
+                name="password"
+                type="password"
+                autoComplete="current-password"
+                required
+                className="relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-b-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
+                placeholder="Mot de passe"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+              />
+            </div>
+          </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Accès à votre espace</CardTitle>
-            <CardDescription>
-              Connectez-vous ou créez votre compte pour accéder à vos exercices et contenus personnalisés
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Tabs defaultValue="login" className="w-full">
-              <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="login">Connexion</TabsTrigger>
-                <TabsTrigger value="register">Inscription</TabsTrigger>
-              </TabsList>
+          {loginError && (
+            <div className="text-red-600 text-sm text-center">
+              {loginError.message}
+            </div>
+          )}
 
-              {/* ✅ FORMULAIRE DE CONNEXION */}
-              <TabsContent value="login">
-                <form onSubmit={handleLogin} className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="login-email">Email</Label>
-                    <Input
-                      id="login-email"
-                      type="email"
-                      placeholder="votre@email.com"
-                      value={loginForm.email}
-                      onChange={(e) =>
-                        setLoginForm({ ...loginForm, email: e.target.value })
-                      }
-                      required
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="login-password">Mot de passe</Label>
-                    <Input
-                      id="login-password"
-                      type="password"
-                      value={loginForm.password}
-                      onChange={(e) =>
-                        setLoginForm({ ...loginForm, password: e.target.value })
-                      }
-                      required
-                    />
-                  </div>
-                  <Button type="submit" className="w-full" disabled={loginMutation.isPending}>
-                    {loginMutation.isPending ? "Connexion..." : "Se connecter"}
-                  </Button>
-                </form>
-              </TabsContent>
+          <div>
+            <button
+              type="submit"
+              disabled={isLoginLoading}
+              className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isLoginLoading ? "Connexion..." : "Se connecter"}
+            </button>
+          </div>
 
-              {/* ✅ FORMULAIRE D'INSCRIPTION */}
-              <TabsContent value="register">
-                <form onSubmit={handleRegister} className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="register-firstName">Prénom</Label>
-                      <Input
-                        id="register-firstName"
-                        type="text"
-                        value={registerForm.firstName}
-                        onChange={(e) =>
-                          setRegisterForm({ ...registerForm, firstName: e.target.value })
-                        }
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="register-lastName">Nom</Label>
-                      <Input
-                        id="register-lastName"
-                        type="text"
-                        value={registerForm.lastName}
-                        onChange={(e) =>
-                          setRegisterForm({ ...registerForm, lastName: e.target.value })
-                        }
-                      />
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="register-email">Email</Label>
-                    <Input
-                      id="register-email"
-                      type="email"
-                      placeholder="votre@email.com"
-                      value={registerForm.email}
-                      onChange={(e) =>
-                        setRegisterForm({ ...registerForm, email: e.target.value })
-                      }
-                      required
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="register-password">Mot de passe</Label>
-                    <Input
-                      id="register-password"
-                      type="password"
-                      value={registerForm.password}
-                      onChange={(e) =>
-                        setRegisterForm({ ...registerForm, password: e.target.value })
-                      }
-                      required
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="register-role">Rôle (patient ou admin)</Label>
-                    <Input
-                      id="register-role"
-                      type="text"
-                      value={registerForm.role}
-                      onChange={(e) =>
-                        setRegisterForm({ ...registerForm, role: e.target.value })
-                      }
-                    />
-                  </div>
-                  <Button type="submit" className="w-full" disabled={registerMutation.isPending}>
-                    {registerMutation.isPending ? "Création..." : "Créer mon compte"}
-                  </Button>
-                </form>
-              </TabsContent>
-            </Tabs>
-          </CardContent>
-        </Card>
-
-        {/* ✅ LIEN INSTAGRAM */}
-        <div className="mt-6 text-center">
-          <a
-            href="https://instagram.com/apaperigueux"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-2 text-gray-600 hover:text-indigo-600 transition-colors"
-          >
-            <Instagram size={20} />
-            <span>Suivez-nous sur Instagram @apaperigueux</span>
-          </a>
-        </div>
+          <div className="text-center">
+            <button
+              type="button"
+              onClick={() => setLocation("/register")}
+              className="text-indigo-600 hover:text-indigo-500"
+            >
+              Pas de compte ? S'inscrire
+            </button>
+          </div>
+        </form>
       </div>
     </div>
   );
