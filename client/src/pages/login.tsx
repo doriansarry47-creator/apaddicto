@@ -1,7 +1,7 @@
 // pages/LoginPage.tsx
 import { useState } from "react";
 import { useLocation } from "wouter";
-import { useAuth } from "../hooks/useAuth";
+import { useAuth } from "../hooks/use-auth";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
