@@ -12,7 +12,7 @@ import { Instagram } from "lucide-react";
 export default function Login() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
-  const { data: user } = useAuthQuery();
+  const { data: user, isLoading } = useAuthQuery();
 
   const [loginForm, setLoginForm] = useState({
     email: "",
@@ -30,12 +30,12 @@ export default function Login() {
   const loginMutation = useLoginMutation();
   const registerMutation = useRegisterMutation();
 
-  // Redirect if user is already authenticated
+  // ✅ Redirection uniquement si l'utilisateur est connecté
   useEffect(() => {
-    if (user) {
-      setLocation("/");
+    if (user && !isLoading) {
+      setLocation("/dashboard"); // change la route cible
     }
-  }, [user, setLocation]);
+  }, [user, isLoading, setLocation]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -46,7 +46,6 @@ export default function Login() {
         title: "Connexion réussie",
         description: "Bienvenue dans votre espace thérapeutique",
       });
-      // Redirection will happen via useEffect when user state updates
     } catch (error) {
       toast({
         title: "Erreur de connexion",
@@ -65,7 +64,6 @@ export default function Login() {
         title: "Inscription réussie",
         description: "Votre compte a été créé avec succès",
       });
-      // Redirection will happen via useEffect when user state updates
     } catch (error) {
       toast({
         title: "Erreur d'inscription",
@@ -97,6 +95,7 @@ export default function Login() {
                 <TabsTrigger value="register">Inscription</TabsTrigger>
               </TabsList>
 
+              {/* ✅ FORMULAIRE DE CONNEXION */}
               <TabsContent value="login">
                 <form onSubmit={handleLogin} className="space-y-4">
                   <div className="space-y-2">
@@ -130,6 +129,7 @@ export default function Login() {
                 </form>
               </TabsContent>
 
+              {/* ✅ FORMULAIRE D'INSCRIPTION */}
               <TabsContent value="register">
                 <form onSubmit={handleRegister} className="space-y-4">
                   <div className="grid grid-cols-2 gap-4">
@@ -182,7 +182,7 @@ export default function Login() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="register-role">Rôle (entrez "admin" pour les privilèges admin)</Label>
+                    <Label htmlFor="register-role">Rôle (patient ou admin)</Label>
                     <Input
                       id="register-role"
                       type="text"
@@ -201,7 +201,7 @@ export default function Login() {
           </CardContent>
         </Card>
 
-        {/* Lien Instagram */}
+        {/* ✅ LIEN INSTAGRAM */}
         <div className="mt-6 text-center">
           <a
             href="https://instagram.com/apaperigueux"
@@ -217,4 +217,3 @@ export default function Login() {
     </div>
   );
 }
-
