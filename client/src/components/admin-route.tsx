@@ -1,4 +1,4 @@
-import { useAuthQuery } from "@/hooks/use-auth.ts";
+import { useAuth } from "@/hooks/use-auth.ts";
 import { Redirect } from "wouter";
 import type { ReactNode } from "react";
 
@@ -7,7 +7,7 @@ interface AdminRouteProps {
 }
 
 export function AdminRoute({ children }: AdminRouteProps) {
-  const { data: user, isLoading } = useAuthQuery();
+  const { user, isLoading } = useAuth();
 
   if (isLoading) {
     // You can render a loading spinner here

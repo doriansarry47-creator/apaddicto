@@ -1,10 +1,10 @@
 import { Link, useLocation } from "wouter";
 import { cn } from "@/lib/utils";
-import { useAuthQuery } from "@/hooks/use-auth";
+import { useAuth } from "@/hooks/use-auth";
 
 export function Navigation() {
   const [location] = useLocation();
-  const { data: user } = useAuthQuery();
+  const { user } = useAuth();
 
   const isActive = (path: string) => {
     if (path === "/" && location === "/") return true;

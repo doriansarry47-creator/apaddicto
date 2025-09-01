@@ -4,16 +4,16 @@ import { useState, useEffect } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 // Import des pages
-import LoginPage from "./pages/LoginPage";
-import RegisterPage from "./pages/RegisterPage";
-import DashboardPage from "./pages/DashboardPage";
-import HomePage from "./pages/HomePage";
-import ExercisesPage from "./pages/ExercisesPage";
-import ProfilePage from "./pages/ProfilePage";
-import NotFoundPage from "./pages/NotFoundPage";
+import LoginPage from "./pages/login";
+import RegisterPage from "./pages/register";
+import DashboardPage from "./pages/dashboard";
+import HomePage from "./pages/home";
+import ExercisesPage from "./pages/exercises";
+import ProfilePage from "./pages/profile";
+import NotFoundPage from "./pages/not-found";
 
 // Hook pour l'authentification
-import { useAuth } from "./hooks/useAuth";
+import { useAuth } from "./hooks/use-auth";
 
 const queryClient = new QueryClient();
 

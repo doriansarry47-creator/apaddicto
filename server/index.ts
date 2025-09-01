@@ -76,3 +76,10 @@ app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
 });
 
 export default app;
+
+const port = process.env.PORT || 3001;
+if (process.env.NODE_ENV !== "test") {
+  app.listen(port, () => {
+    log(`Server listening on http://localhost:${port}`);
+  });
+}
