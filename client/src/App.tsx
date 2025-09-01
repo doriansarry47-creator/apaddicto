@@ -1,100 +1,81 @@
-import { Switch, Route } from "wouter";
-import { queryClient } from "./lib/queryClient";
-import { QueryClientProvider } from "@tanstack/react-query";
-import { Toaster } from "@/components/ui/toaster";
-import { TooltipProvider } from "@/components/ui/tooltip";
-import { ProtectedRoute } from "@/components/protected-route";
-import { AdminRoute } from "@/components/admin-route";
+// App.tsx - Configuration du routeur principal
+import { Route, Switch, Redirect } from "wouter";
+import { useState, useEffect } from "react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
-// Page Imports
-import Dashboard from "@/pages/dashboard";
-import Exercises from "@/pages/exercises";
-import ExerciseDetail from "@/pages/exercise-detail";
-import Tracking from "@/pages/tracking";
-import Education from "@/pages/education";
-import Profile from "@/pages/profile";
-import Login from "@/pages/login";
-import NotFound from "@/pages/not-found";
+// Import des pages
+import LoginPage from "./pages/LoginPage";
+import RegisterPage from "./pages/RegisterPage";
+import DashboardPage from "./pages/DashboardPage";
+import HomePage from "./pages/HomePage";
+import ExercisesPage from "./pages/ExercisesPage";
+import ProfilePage from "./pages/ProfilePage";
+import NotFoundPage from "./pages/NotFoundPage";
 
-// Admin Page Imports
-import AdminDashboard from "@/pages/admin/dashboard";
-import ManageExercises from "@/pages/admin/manage-exercises";
-import ManageContent from "@/pages/admin/manage-content";
+// Hook pour l'authentification
+import { useAuth } from "./hooks/useAuth";
 
+const queryClient = new QueryClient();
 
-function AppContent() {
+function AppRoutes() {
+  const { user, isLoading } = useAuth();
+
+  // Afficher un loader pendant la vérification de l'authentification
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
+
   return (
     <Switch>
-      {/* Public Routes */}
-      <Route path="/login" component={Login} />
-      <Route path="/register" component={Login} />
-
-      {/* Protected Routes */}
-      <Route path="/">
-        <ProtectedRoute>
-          <Dashboard />
-        </ProtectedRoute>
+      {/* Routes publiques */}
+      <Route path="/login">
+        {user ? <Redirect to="/dashboard" /> : <LoginPage />}
       </Route>
+      
+      <Route path="/register">
+        {user ? <Redirect to="/dashboard" /> : <RegisterPage />}
+      </Route>
+
+      {/* Routes protégées - AJOUTÉES POUR CORRIGER LE 404 */}
+      <Route path="/dashboard">
+        {!user ? <Redirect to="/login" /> : <DashboardPage />}
+      </Route>
+
+      <Route path="/home">
+        {!user ? <Redirect to="/login" /> : <HomePage />}
+      </Route>
+
       <Route path="/exercises">
-        <ProtectedRoute>
-          <Exercises />
-        </ProtectedRoute>
+        {!user ? <Redirect to="/login" /> : <ExercisesPage />}
       </Route>
-      <Route path="/exercise/:id">
-        <ProtectedRoute>
-          <ExerciseDetail />
-        </ProtectedRoute>
-      </Route>
-      <Route path="/tracking">
-        <ProtectedRoute>
-          <Tracking />
-        </ProtectedRoute>
-      </Route>
-      <Route path="/education">
-        <ProtectedRoute>
-          <Education />
-        </ProtectedRoute>
-      </Route>
+
       <Route path="/profile">
-        <ProtectedRoute>
-          <Profile />
-        </ProtectedRoute>
+        {!user ? <Redirect to="/login" /> : <ProfilePage />}
       </Route>
 
-      {/* Admin Routes */}
-      <Route path="/admin">
-        <AdminRoute>
-          <AdminDashboard />
-        </AdminRoute>
-      </Route>
-      <Route path="/admin/manage-exercises">
-        <AdminRoute>
-          <ManageExercises />
-        </AdminRoute>
-      </Route>
-      <Route path="/admin/manage-content">
-        <AdminRoute>
-          <ManageContent />
-        </AdminRoute>
+      {/* Route racine - CORRECTION IMPORTANTE */}
+      <Route path="/">
+        {user ? <Redirect to="/dashboard" /> : <Redirect to="/login" />}
       </Route>
 
-      {/* 404 Not Found */}
-      <Route component={NotFound} />
+      {/* Route 404 - doit être en dernier */}
+      <Route>
+        <NotFoundPage />
+      </Route>
     </Switch>
   );
 }
 
-function App() {
+export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <div className="min-h-screen bg-background text-foreground font-roboto">
-          <Toaster />
-          <AppContent />
-        </div>
-      </TooltipProvider>
+      <div className="min-h-screen bg-gray-50">
+        <AppRoutes />
+      </div>
     </QueryClientProvider>
   );
 }
-
-export default App;
