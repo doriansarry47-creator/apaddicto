@@ -11,15 +11,15 @@ module.exports = {
       max_memory_restart: '1G',
       env: {
         NODE_ENV: 'development',
-        DATABASE_URL: 'postgresql://neondb_owner:npg_vRJU7LlnYG1y@ep-soft-bush-ab0hbww0-pooler.eu-west-2.aws.neon.tech/neondb?sslmode=require&channel_binding=require',
-        SESSION_SECRET: 'Apaddicto2024SecretKey',
         PORT: 5000
+        // DATABASE_URL and SESSION_SECRET should be set as environment variables
+        // Do not hardcode credentials in configuration files
       },
       env_production: {
         NODE_ENV: 'production',
-        DATABASE_URL: 'postgresql://neondb_owner:npg_vRJU7LlnYG1y@ep-soft-bush-ab0hbww0-pooler.eu-west-2.aws.neon.tech/neondb?sslmode=require&channel_binding=require',
-        SESSION_SECRET: 'Apaddicto2024SecretKey',
         PORT: 5000
+        // DATABASE_URL and SESSION_SECRET should be set as environment variables
+        // Do not hardcode credentials in configuration files
       }
     }
   ]
