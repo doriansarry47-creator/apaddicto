@@ -78,7 +78,8 @@
   }
   
   body {
-    @apply bg-background text-foreground font-inter antialiased;
+    @apply bg-background text-foreground antialiased;
+    font-family: var(--font-inter);
     font-feature-settings: "rlig" 1, "calt" 1;
   }
 }

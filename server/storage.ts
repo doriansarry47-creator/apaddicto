@@ -392,6 +392,7 @@ export class DatabaseStorage implements IStorage {
       username: users.username,
       email: users.email,
       role: users.role,
+      therapistId: users.therapistId,
       createdAt: users.createdAt,
     })
     .from(therapistPatients)
@@ -407,6 +408,7 @@ export class DatabaseStorage implements IStorage {
       username: users.username,
       email: users.email,
       role: users.role,
+      therapistId: users.therapistId,
       createdAt: users.createdAt,
     })
     .from(therapistPatients)

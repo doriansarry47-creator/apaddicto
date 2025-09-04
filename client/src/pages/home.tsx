@@ -68,7 +68,7 @@ export default function Home() {
   // Generate weekly chart data
   const weeklyData = Array.from({ length: 7 }, (_, index) => {
     const activityForDay = stats?.dailyActivity.find(
-      day => new Date(day.date).getDay() === (index + 1) % 7
+      (day: any) => new Date(day.date).getDay() === (index + 1) % 7
     );
     return {
       day: WEEKDAYS[index],

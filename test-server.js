@@ -12,7 +12,12 @@ const app = express();
 const port = 3000;
 
 // Database configuration
-const DATABASE_URL = process.env.DATABASE_URL || 'postgresql://neondb_owner:npg_vRJU7LlnYG1y@ep-soft-bush-ab0hbww0-pooler.eu-west-2.aws.neon.tech/neondb?sslmode=require&channel_binding=require';
+const DATABASE_URL = process.env.DATABASE_URL;
+
+if (!DATABASE_URL) {
+  console.error('❌ DATABASE_URL environment variable is required');
+  process.exit(1);
+}
 
 console.log('Starting Apaddicto server...');
 console.log('Database URL:', DATABASE_URL.replace(/:[^:@]*@/, ':****@'));

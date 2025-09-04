@@ -222,9 +222,9 @@ export default function Journal() {
                       {entry.content}
                     </div>
                     
-                    {entry.tags && Array.isArray(entry.tags) && entry.tags.length > 0 && (
+                    {entry.tags && Array.isArray(entry.tags) && entry.tags.length > 0 ? (
                       <div className="flex flex-wrap gap-2 mt-3">
-                        {entry.tags.map((tag: string, index: number) => (
+                        {(entry.tags as string[]).map((tag: string, index: number) => (
                           <span
                             key={index}
                             className="px-2 py-1 bg-primary-100 text-primary-700 text-xs rounded-full"
@@ -234,7 +234,7 @@ export default function Journal() {
                           </span>
                         ))}
                       </div>
-                    )}
+                    ) : null}
                   </CardContent>
                 </Card>
               ))}
