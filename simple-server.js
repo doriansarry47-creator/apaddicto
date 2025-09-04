@@ -32,6 +32,7 @@ const users = pgTable("users", {
   level: integer("level").default(1),
   points: integer("points").default(0),
   isActive: boolean("is_active").default(true),
+  lastActivity: timestamp("last_activity").defaultNow(),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -73,15 +74,54 @@ const exerciseSessions = pgTable("exercise_sessions", {
 });
 
 let db;
+let pool;
 
-try {
-  const pool = new Pool({ connectionString: DATABASE_URL });
-  db = drizzle({ client: pool, schema: { users, exercises, cravingEntries, exerciseSessions } });
-  console.log('✅ Database initialized successfully');
-} catch (error) {
-  console.error('❌ Database initialization failed:', error);
-  process.exit(1);
+// Enhanced database connection with retry logic
+async function initializeDatabase(retries = 3) {
+  for (let i = 0; i < retries; i++) {
+    try {
+      pool = new Pool({ 
+        connectionString: DATABASE_URL,
+        max: 20,
+        idleTimeoutMillis: 30000,
+        connectionTimeoutMillis: 2000,
+      });
+      
+      db = drizzle({ client: pool, schema: { users, exercises, cravingEntries, exerciseSessions } });
+      
+      // Test connection
+      await pool.query('SELECT 1');
+      console.log('✅ Database initialized successfully');
+      return;
+    } catch (error) {
+      console.error(`❌ Database initialization attempt ${i + 1} failed:`, error.message);
+      if (i === retries - 1) {
+        console.error('❌ All database connection attempts failed');
+        process.exit(1);
+      }
+      // Wait before retry
+      await new Promise(resolve => setTimeout(resolve, 2000));
+    }
+  }
 }
+
+// Database operation wrapper with error handling
+async function executeWithRetry(operation, retries = 2) {
+  for (let i = 0; i < retries; i++) {
+    try {
+      return await operation();
+    } catch (error) {
+      console.error(`Database operation attempt ${i + 1} failed:`, error.message);
+      if (i === retries - 1) {
+        throw new Error(`Database operation failed after ${retries} attempts: ${error.message}`);
+      }
+      await new Promise(resolve => setTimeout(resolve, 1000));
+    }
+  }
+}
+
+// Initialize database
+await initializeDatabase();
 
 // Middleware
 app.use(express.json());
@@ -116,6 +156,15 @@ app.use((req, res, next) => {
   }
 });
 
+// Apply activity tracking to all API routes (except system endpoints)
+app.use('/api', (req, res, next) => {
+  // Skip activity tracking for system endpoints
+  if (req.path === '/api/test-db' || req.path === '/api/init-db') {
+    return next();
+  }
+  trackActivity(req, res, next);
+});
+
 // Authentication helpers
 class AuthService {
   static async hashPassword(password) {
@@ -128,33 +177,34 @@ class AuthService {
   }
 
   static async getUserByEmail(email) {
-    try {
+    return executeWithRetry(async () => {
       const result = await db.select().from(users).where(eq(users.email, email)).limit(1);
       return result[0] || null;
-    } catch (error) {
-      console.error('Error getting user by email:', error);
-      return null;
-    }
+    });
   }
 
   static async createUser(userData) {
-    try {
+    return executeWithRetry(async () => {
       const result = await db.insert(users).values(userData).returning();
       return result[0];
-    } catch (error) {
-      console.error('Error creating user:', error);
-      throw error;
-    }
+    });
   }
 
   static async getUserById(id) {
-    try {
+    return executeWithRetry(async () => {
       const result = await db.select().from(users).where(eq(users.id, id)).limit(1);
       return result[0] || null;
-    } catch (error) {
-      console.error('Error getting user by ID:', error);
-      return null;
-    }
+    });
+  }
+
+  static async updateUserActivity(userId) {
+    return executeWithRetry(async () => {
+      await db.execute(sql`
+        UPDATE users 
+        SET last_activity = NOW() 
+        WHERE id = ${userId}
+      `);
+    });
   }
 }
 
@@ -175,6 +225,19 @@ function requireAdmin(req, res, next) {
     return res.status(403).json({ message: 'Accès administrateur requis' });
   }
   
+  next();
+}
+
+// Middleware to track user activity
+async function trackActivity(req, res, next) {
+  if (req.session?.user?.id) {
+    try {
+      await AuthService.updateUserActivity(req.session.user.id);
+    } catch (error) {
+      console.error('Error tracking user activity:', error);
+      // Don't fail the request if activity tracking fails
+    }
+  }
   next();
 }
 
@@ -224,6 +287,7 @@ app.get('/api/init-db', async (req, res) => {
         level INTEGER DEFAULT 1,
         points INTEGER DEFAULT 0,
         is_active BOOLEAN DEFAULT true,
+        last_activity TIMESTAMP DEFAULT NOW(),
         created_at TIMESTAMP DEFAULT NOW(),
         updated_at TIMESTAMP DEFAULT NOW()
       );
@@ -270,6 +334,16 @@ app.get('/api/init-db', async (req, res) => {
         created_at TIMESTAMP DEFAULT NOW()
       );
     `);
+
+    // Add last_activity column if it doesn't exist (for existing tables)
+    try {
+      await db.execute(sql`
+        ALTER TABLE users ADD COLUMN IF NOT EXISTS last_activity TIMESTAMP DEFAULT NOW()
+      `);
+    } catch (error) {
+      // Column might already exist, ignore error
+      console.log('Last activity column already exists or error adding it:', error.message);
+    }
 
     res.json({ message: 'Database tables initialized successfully' });
   } catch (error) {
@@ -378,6 +452,14 @@ app.post('/api/auth/login', async (req, res) => {
       role: user.role,
     };
 
+    // Update last activity
+    try {
+      await AuthService.updateUserActivity(user.id);
+    } catch (error) {
+      console.error('Error updating user activity:', error);
+      // Don't fail login if activity update fails
+    }
+
     console.log('✅ User logged in successfully:', email);
 
     res.json({ 
@@ -404,8 +486,174 @@ app.post('/api/auth/logout', (req, res) => {
   });
 });
 
-app.get('/api/auth/me', requireAuth, (req, res) => {
+app.get('/api/auth/me', requireAuth, trackActivity, (req, res) => {
   res.json({ user: req.session.user });
+});
+
+// Admin routes for patient management
+app.get('/api/admin/patients', requireAdmin, trackActivity, async (req, res) => {
+  try {
+    const result = await executeWithRetry(async () => {
+      return await db.execute(sql`
+        SELECT 
+          id, 
+          email, 
+          first_name, 
+          last_name, 
+          is_active, 
+          created_at,
+          last_activity,
+          EXTRACT(EPOCH FROM (NOW() - last_activity)) / 86400 as days_inactive
+        FROM users 
+        WHERE role = 'patient'
+        ORDER BY last_activity DESC
+      `);
+    });
+
+    const patients = result.rows.map(patient => ({
+      id: patient.id,
+      email: patient.email,
+      firstName: patient.first_name,
+      lastName: patient.last_name,
+      isActive: patient.is_active,
+      createdAt: patient.created_at,
+      lastActivity: patient.last_activity,
+      daysInactive: Math.floor(patient.days_inactive || 0)
+    }));
+
+    res.json({ patients });
+  } catch (error) {
+    console.error('❌ Error fetching patients:', error);
+    res.status(500).json({ 
+      message: error.message || "Erreur lors de la récupération des patients" 
+    });
+  }
+});
+
+app.get('/api/admin/patients/inactive/:days', requireAdmin, trackActivity, async (req, res) => {
+  try {
+    const days = parseInt(req.params.days) || 30;
+    
+    const result = await executeWithRetry(async () => {
+      return await db.execute(sql`
+        SELECT 
+          id, 
+          email, 
+          first_name, 
+          last_name, 
+          is_active, 
+          created_at,
+          last_activity,
+          EXTRACT(EPOCH FROM (NOW() - last_activity)) / 86400 as days_inactive
+        FROM users 
+        WHERE role = 'patient' 
+          AND last_activity < NOW() - INTERVAL '${days} days'
+        ORDER BY last_activity ASC
+      `);
+    });
+
+    const inactivePatients = result.rows.map(patient => ({
+      id: patient.id,
+      email: patient.email,
+      firstName: patient.first_name,
+      lastName: patient.last_name,
+      isActive: patient.is_active,
+      createdAt: patient.created_at,
+      lastActivity: patient.last_activity,
+      daysInactive: Math.floor(patient.days_inactive || 0)
+    }));
+
+    res.json({ 
+      inactivePatients,
+      criteria: `Inactifs depuis plus de ${days} jours`
+    });
+  } catch (error) {
+    console.error('❌ Error fetching inactive patients:', error);
+    res.status(500).json({ 
+      message: error.message || "Erreur lors de la récupération des patients inactifs" 
+    });
+  }
+});
+
+app.put('/api/admin/patients/:id/deactivate', requireAdmin, trackActivity, async (req, res) => {
+  try {
+    const patientId = req.params.id;
+    
+    const result = await executeWithRetry(async () => {
+      return await db.execute(sql`
+        UPDATE users 
+        SET is_active = false, updated_at = NOW()
+        WHERE id = ${patientId} AND role = 'patient'
+        RETURNING id, email, first_name, last_name
+      `);
+    });
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ message: 'Patient non trouvé' });
+    }
+
+    const patient = result.rows[0];
+    console.log(`👤 Patient account deactivated by admin:`, patient.email);
+
+    res.json({ 
+      message: 'Compte patient désactivé avec succès',
+      patient: {
+        id: patient.id,
+        email: patient.email,
+        firstName: patient.first_name,
+        lastName: patient.last_name
+      }
+    });
+  } catch (error) {
+    console.error('❌ Error deactivating patient:', error);
+    res.status(500).json({ 
+      message: error.message || "Erreur lors de la désactivation du patient" 
+    });
+  }
+});
+
+app.delete('/api/admin/patients/:id', requireAdmin, trackActivity, async (req, res) => {
+  try {
+    const patientId = req.params.id;
+    
+    // First get patient info for logging
+    const patientResult = await executeWithRetry(async () => {
+      return await db.execute(sql`
+        SELECT email, first_name, last_name 
+        FROM users 
+        WHERE id = ${patientId} AND role = 'patient'
+      `);
+    });
+
+    if (patientResult.rows.length === 0) {
+      return res.status(404).json({ message: 'Patient non trouvé' });
+    }
+
+    const patient = patientResult.rows[0];
+
+    // Delete related data first
+    await executeWithRetry(async () => {
+      await db.execute(sql`DELETE FROM exercise_sessions WHERE user_id = ${patientId}`);
+      await db.execute(sql`DELETE FROM craving_entries WHERE user_id = ${patientId}`);
+      await db.execute(sql`DELETE FROM users WHERE id = ${patientId} AND role = 'patient'`);
+    });
+
+    console.log(`🗑️ Patient account deleted by admin:`, patient.email);
+
+    res.json({ 
+      message: 'Compte patient supprimé avec succès',
+      patient: {
+        email: patient.email,
+        firstName: patient.first_name,
+        lastName: patient.last_name
+      }
+    });
+  } catch (error) {
+    console.error('❌ Error deleting patient:', error);
+    res.status(500).json({ 
+      message: error.message || "Erreur lors de la suppression du patient" 
+    });
+  }
 });
 
 // Static file serving
@@ -433,6 +681,11 @@ app.listen(port, '0.0.0.0', () => {
   console.log(`   POST /api/auth/login - Se connecter`);
   console.log(`   POST /api/auth/logout - Se déconnecter`);
   console.log(`   GET  /api/auth/me - Profil utilisateur`);
+  console.log(`🔧 Admin endpoints (requires admin role):`);
+  console.log(`   GET  /api/admin/patients - Liste tous les patients`);
+  console.log(`   GET  /api/admin/patients/inactive/:days - Patients inactifs`);
+  console.log(`   PUT  /api/admin/patients/:id/deactivate - Désactiver un patient`);
+  console.log(`   DELETE /api/admin/patients/:id - Supprimer un patient`);
 });
 
 // Handle process termination
