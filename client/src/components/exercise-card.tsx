@@ -10,7 +10,8 @@ interface ExerciseCardProps {
   compact?: boolean;
 }
 
-const getExerciseIcon = (type: string) => {
+// Move utility functions outside component to prevent recreation on every render
+const getExerciseIcon = (type: string): string => {
   switch (type) {
     case 'breathing':
       return 'fas fa-wind';
@@ -25,7 +26,7 @@ const getExerciseIcon = (type: string) => {
   }
 };
 
-const getDifficultyColor = (difficulty: string) => {
+const getDifficultyColor = (difficulty: string): string => {
   switch (difficulty) {
     case 'beginner':
       return 'text-green-600';
@@ -38,7 +39,7 @@ const getDifficultyColor = (difficulty: string) => {
   }
 };
 
-const getDifficultyLabel = (difficulty: string) => {
+const getDifficultyLabel = (difficulty: string): string => {
   switch (difficulty) {
     case 'beginner':
       return 'Débutant';
