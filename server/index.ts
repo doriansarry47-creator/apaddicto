@@ -3,7 +3,7 @@ import express from 'express';
 import session from 'express-session';
 import memorystore from 'memorystore';
 import path from 'path';
-import { registerRoutes } from './routes.js';
+import { registerRoutes } from './routes.ts';
 
 const app = express();
 const port = process.env.PORT || 5000;

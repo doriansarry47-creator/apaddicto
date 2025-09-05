@@ -1,7 +1,7 @@
-// server/routes.js - Minimal routes for API functionality
+// server/routes.ts - Minimal routes for API functionality
 import express from 'express';
 
-export function registerRoutes(app) {
+export function registerRoutes(app: express.Application) {
   // Health check endpoint
   app.get('/api/health', (req, res) => {
     res.json({ 
@@ -25,7 +25,7 @@ export function registerRoutes(app) {
       res.status(500).json({ 
         status: 'error',
         message: 'Database connection failed',
-        error: error.message 
+        error: error instanceof Error ? error.message : 'Unknown error'
       });
     }
   });
