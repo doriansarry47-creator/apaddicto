@@ -413,7 +413,7 @@ app.use(express.static('dist/public'));
 
 // Catch all for SPA
 app.get('*', (req, res) => {
-  res.sendFile('index.html', { root: '/home/user/webapp/dist/public' });
+  res.sendFile('index.html', { root: './dist/public' });
 });
 
 // Error handling middleware
