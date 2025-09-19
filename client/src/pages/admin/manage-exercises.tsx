@@ -14,29 +14,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Plus, Trash2, Edit, Activity, AlertTriangle, Filter, Image, Clock, Target, Library, Star, Users, Play, Settings, Camera, Video } from "lucide-react";
+import { EXERCISE_CATEGORIES, SESSION_CATEGORIES, DIFFICULTY_LEVELS, EMERGENCY_ROUTINE_CATEGORIES, getExerciseCategoryLabel, getDifficultyLabel, getDifficultyBadgeVariant } from "@/lib/categories";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 
 type FormData = InsertExercise;
 
-// Catégories prédéfinies (alignées avec la base de données)
-const EXERCISE_CATEGORIES = [
-  { value: "cardio", label: "Cardio Training" },
-  { value: "strength", label: "Renforcement Musculaire" },
-  { value: "flexibility", label: "Étirement & Flexibilité" },
-  { value: "mindfulness", label: "Pleine Conscience & Méditation" },
-  { value: "relaxation", label: "Relaxation" },
-  { value: "respiration", label: "Exercices de Respiration" },
-  { value: "meditation", label: "Méditation" },
-  { value: "debutant", label: "Exercices Débutant" },
-];
-
-// Niveaux de difficulté
-const DIFFICULTY_LEVELS = [
-  { value: "beginner", label: "Débutant" },
-  { value: "intermediate", label: "Intermédiaire" },
-  { value: "advanced", label: "Avancé" },
-];
+// Catégories importées depuis le fichier centralisé - plus besoin de les redéfinir ici
 
 export default function ManageExercises() {
   const { toast } = useToast();
@@ -541,18 +525,10 @@ export default function ManageExercises() {
                               <div className="flex items-center space-x-2 mb-2">
                                 <h3 className="font-bold text-lg">{exercise.title}</h3>
                                 <Badge variant="outline">
-                                  {EXERCISE_CATEGORIES.find(c => c.value === exercise.category)?.label || exercise.category}
+                                  {getExerciseCategoryLabel(exercise.category)}
                                 </Badge>
-                                <Badge
-                                  variant={
-                                    exercise.difficulty === "beginner"
-                                      ? "default"
-                                      : exercise.difficulty === "intermediate"
-                                      ? "secondary"
-                                      : "destructive"
-                                  }
-                                >
-                                  {DIFFICULTY_LEVELS.find(d => d.value === exercise.difficulty)?.label || exercise.difficulty}
+                                <Badge variant={getDifficultyBadgeVariant(exercise.difficulty)}>
+                                  {getDifficultyLabel(exercise.difficulty)}
                                 </Badge>
                               </div>
                               <p className="text-sm text-muted-foreground mb-2">
@@ -1119,11 +1095,11 @@ export default function ManageExercises() {
                         <SelectValue placeholder="Sélectionner une catégorie" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="morning">Séance Matinale</SelectItem>
-                        <SelectItem value="evening">Séance du Soir</SelectItem>
-                        <SelectItem value="crisis">Gestion de Crise</SelectItem>
-                        <SelectItem value="maintenance">Entretien</SelectItem>
-                        <SelectItem value="recovery">Récupération</SelectItem>
+                        {SESSION_CATEGORIES.map((category) => (
+                          <SelectItem key={category.value} value={category.value}>
+                            {category.label}
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                   </div>
@@ -1353,10 +1329,11 @@ export default function ManageExercises() {
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="general">Général</SelectItem>
-                          <SelectItem value="breathing">Respiration</SelectItem>
-                          <SelectItem value="grounding">Ancrage</SelectItem>
-                          <SelectItem value="distraction">Distraction</SelectItem>
+                          {EMERGENCY_ROUTINE_CATEGORIES.map((category) => (
+                            <SelectItem key={category.value} value={category.value}>
+                              {category.label}
+                            </SelectItem>
+                          ))}
                         </SelectContent>
                       </Select>
                     </div>
@@ -1434,10 +1411,7 @@ export default function ManageExercises() {
                                   </Badge>
                                 )}
                                 <Badge variant="outline">
-                                  {routine.category === 'general' ? 'Général' : 
-                                   routine.category === 'breathing' ? 'Respiration' :
-                                   routine.category === 'grounding' ? 'Ancrage' : 
-                                   routine.category === 'distraction' ? 'Distraction' : routine.category}
+                                  {EMERGENCY_ROUTINE_CATEGORIES.find(c => c.value === routine.category)?.label || routine.category}
                                 </Badge>
                               </div>
                               {routine.description && (

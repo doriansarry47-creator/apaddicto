@@ -1,9 +1,11 @@
+import { EXERCISE_CATEGORIES, DIFFICULTY_LEVELS, ExerciseCategoryValue, DifficultyLevelValue } from './categories';
+
 export interface Exercise {
   id: string;
   title: string;
   description: string;
-  category: 'craving_reduction' | 'relaxation' | 'energy_boost' | 'emotion_management';
-  level: 'beginner' | 'intermediate' | 'advanced' | 'all_levels';
+  category: ExerciseCategoryValue;
+  level: DifficultyLevelValue | 'all_levels';
   duration: number; // in minutes
   intensity: 'gentle' | 'moderate' | 'dynamic';
   type: 'physical' | 'breathing' | 'relaxation' | 'emergency';
@@ -244,21 +246,13 @@ export const exercises: Exercise[] = [
   }
 ];
 
-export const categories = {
-  cardio: 'Cardio Training',
-  strength: 'Renforcement Musculaire',
-  flexibility: 'Étirement & Flexibilité',
-  mindfulness: 'Pleine Conscience & Méditation',
-  relaxation: 'Relaxation',
-  respiration: 'Exercices de Respiration',
-  meditation: 'Méditation',
-  debutant: 'Exercices Débutant'
-} as const;
+// Import des catégories centralisées
+export const categories = Object.fromEntries(
+  EXERCISE_CATEGORIES.map(cat => [cat.value, cat.label])
+) as Record<ExerciseCategoryValue, string>;
 
 export const levels = {
-  beginner: 'Débutant',
-  intermediate: 'Intermédiaire', 
-  advanced: 'Avancé',
+  ...Object.fromEntries(DIFFICULTY_LEVELS.map(level => [level.value, level.label])),
   all_levels: 'Tous niveaux'
 } as const;
 
@@ -268,11 +262,11 @@ export const intensities = {
   dynamic: 'Dynamique'
 } as const;
 
-export function getExercisesByCategory(category: keyof typeof categories) {
+export function getExercisesByCategory(category: ExerciseCategoryValue) {
   return exercises.filter(exercise => exercise.category === category);
 }
 
-export function getExercisesByLevel(level: keyof typeof levels) {
+export function getExercisesByLevel(level: DifficultyLevelValue | 'all_levels') {
   return exercises.filter(exercise => exercise.level === level);
 }
 

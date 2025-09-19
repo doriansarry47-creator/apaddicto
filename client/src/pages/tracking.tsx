@@ -51,7 +51,7 @@ export default function Tracking() {
       
       return () => clearTimeout(timer);
     }
-  }, [authenticatedUser, queryClient]); // Ajout de queryClient comme dépendance mais on évite les boucles
+  }, [authenticatedUser]); // Retirer queryClient des dépendances pour éviter les boucles infinies
 
   const { data: cravingEntries, isLoading: cravingLoading, error: cravingError } = useQuery<CravingEntry[]>({
     queryKey: ["/api/cravings"],
@@ -62,20 +62,29 @@ export default function Tracking() {
         });
         if (!response.ok) {
           console.error(`Erreur API cravings: ${response.status} ${response.statusText}`);
+          if (response.status === 401) {
+            throw new Error('Non autorisé');
+          }
           return [];
         }
         const data = await response.json();
         return Array.isArray(data) ? data : [];
       } catch (error) {
         console.error('Error fetching cravings:', error);
-        return [];
+        throw error; // Laisser l'erreur se propager pour une gestion appropriée
       }
     },
     enabled: !!authenticatedUser && !userLoading,
     initialData: [],
     staleTime: 5 * 60 * 1000, // 5 minutes pour éviter trop de requêtes
     gcTime: 10 * 60 * 1000, // 10 minutes de cache
-    retry: 2,
+    retry: (failureCount, error) => {
+      // Ne pas retry si erreur d'auth
+      if (error?.message?.includes('Non autorisé')) {
+        return false;
+      }
+      return failureCount < 2;
+    },
     retryDelay: 1000
   });
 
@@ -116,20 +125,32 @@ export default function Tracking() {
         });
         if (!response.ok) {
           console.error(`Erreur API exercise-sessions: ${response.status} ${response.statusText}`);
+          if (response.status === 401) {
+            throw new Error('Non autorisé');
+          }
           return [];
         }
         const data = await response.json();
         return Array.isArray(data) ? data : [];
       } catch (error) {
         console.error('Error fetching exercise sessions:', error);
-        return [];
+        if (!error?.message?.includes('Non autorisé')) {
+          // Seulement retourner un tableau vide pour les erreurs non-auth
+          return [];
+        }
+        throw error;
       }
     },
     enabled: !!authenticatedUser && !userLoading,
     initialData: [],
     staleTime: 3 * 60 * 1000, // 3 minutes
     gcTime: 10 * 60 * 1000, // 10 minutes de cache
-    retry: 1
+    retry: (failureCount, error) => {
+      if (error?.message?.includes('Non autorisé')) {
+        return false;
+      }
+      return failureCount < 1;
+    }
   });
 
   const { data: userStats, isLoading: userStatsLoading } = useQuery<UserStats>({
@@ -165,20 +186,31 @@ export default function Tracking() {
         });
         if (!response.ok) {
           console.error(`Erreur API beck-analyses: ${response.status} ${response.statusText}`);
+          if (response.status === 401) {
+            throw new Error('Non autorisé');
+          }
           return [];
         }
         const data = await response.json();
         return Array.isArray(data) ? data : [];
       } catch (error) {
         console.error('Error fetching beck analyses:', error);
-        return [];
+        if (!error?.message?.includes('Non autorisé')) {
+          return [];
+        }
+        throw error;
       }
     },
     enabled: !!authenticatedUser && !userLoading,
     initialData: [],
     staleTime: 5 * 60 * 1000, // 5 minutes pour les analyses
     gcTime: 15 * 60 * 1000, // 15 minutes de cache
-    retry: 1
+    retry: (failureCount, error) => {
+      if (error?.message?.includes('Non autorisé')) {
+        return false;
+      }
+      return failureCount < 1;
+    }
   });
 
   const { data: antiCravingStrategies, isLoading: strategiesLoading, error: strategiesError } = useQuery<AntiCravingStrategy[]>({
@@ -193,23 +225,49 @@ export default function Tracking() {
         });
         if (!response.ok) {
           console.error(`Erreur API strategies: ${response.status} ${response.statusText}`);
+          if (response.status === 401) {
+            throw new Error('Non autorisé');
+          }
           return [];
         }
         const data = await response.json();
         return Array.isArray(data) ? data : [];
       } catch (error) {
         console.error('Error fetching strategies:', error);
-        return [];
+        if (!error?.message?.includes('Non autorisé')) {
+          return [];
+        }
+        throw error;
       }
     },
     enabled: !!authenticatedUser && !userLoading,
     initialData: [],
     staleTime: 3 * 60 * 1000, // 3 minutes
     gcTime: 10 * 60 * 1000, // 10 minutes
-    retry: 1
+    retry: (failureCount, error) => {
+      if (error?.message?.includes('Non autorisé')) {
+        return false;
+      }
+      return failureCount < 1;
+    }
   });
 
   const isLoading = userLoading || cravingLoading || statsLoading || sessionsLoading || userStatsLoading || beckLoading || strategiesLoading;
+
+  // Afficher une erreur si l'utilisateur n'est pas authentifié
+  if (!userLoading && !authenticatedUser) {
+    return (
+      <>
+        <Navigation />
+        <main className="container mx-auto px-4 py-6 pb-20 md:pb-6">
+          <div className="text-center py-12">
+            <h1 className="text-2xl font-bold text-foreground mb-4">Accès non autorisé</h1>
+            <p className="text-muted-foreground">Vous devez être connecté pour accéder à cette page.</p>
+          </div>
+        </main>
+      </>
+    );
+  }
 
   if (isLoading) {
     return (

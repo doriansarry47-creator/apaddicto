@@ -10,6 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
+import { EXERCISE_CATEGORIES, DIFFICULTY_LEVELS, ExerciseCategoryValue, DifficultyLevelValue, getExerciseCategoryLabel, getDifficultyLabel } from "@/lib/categories";
 import RespirationPlayer from "@/components/interactive-exercises/RespirationPlayer";
 import { Heart, Square, Triangle, Sparkles } from "lucide-react";
 import type { Exercise as APIExercise } from "../../../../shared/schema";
@@ -19,8 +20,8 @@ interface Exercise {
   id: string;
   title: string;
   description: string;
-  category: 'cardio' | 'strength' | 'flexibility' | 'mindfulness' | 'relaxation' | 'respiration' | 'meditation' | 'debutant';
-  level: 'beginner' | 'intermediate' | 'advanced' | 'all_levels';
+  category: ExerciseCategoryValue;
+  level: DifficultyLevelValue | 'all_levels';
   duration: number;
   intensity: 'gentle' | 'moderate' | 'dynamic';
   type: 'physical' | 'breathing' | 'relaxation' | 'emergency';
@@ -30,7 +31,7 @@ interface Exercise {
 }
 
 // Mappages des catégories API vers les catégories frontend - correspondance directe et variantes
-const categoryMapping: Record<string, keyof typeof categories> = {
+const categoryMapping: Record<string, ExerciseCategoryValue> = {
   // Correspondance directe avec les catégories de l'admin
   'cardio': 'cardio',
   'strength': 'strength',
@@ -50,7 +51,7 @@ const interactiveBreathingExercises = [
     id: 'heart-coherence-interactive',
     title: 'Cohérence Cardiaque Interactive',
     description: 'Exercice de cohérence cardiaque avec animation guidée pour synchroniser votre respiration et votre rythme cardiaque.',
-    category: 'respiration' as keyof typeof categories,
+    category: 'respiration' as ExerciseCategoryValue,
     level: 'beginner' as const,
     duration: 5,
     intensity: 'gentle' as const,
@@ -63,7 +64,7 @@ const interactiveBreathingExercises = [
     id: 'square-breathing-interactive',
     title: 'Respiration Carrée Interactive',
     description: 'Technique de respiration carrée avec visualisation animée pour calmer l\'esprit et réduire le stress.',
-    category: 'respiration' as keyof typeof categories,
+    category: 'respiration' as ExerciseCategoryValue,
     level: 'beginner' as const,
     duration: 4,
     intensity: 'gentle' as const,
@@ -76,7 +77,7 @@ const interactiveBreathingExercises = [
     id: 'triangle-breathing-interactive',
     title: 'Respiration Triangle Interactive',
     description: 'Exercice de respiration triangulaire avec guide visuel pour équilibrer votre système nerveux et favoriser la relaxation.',
-    category: 'respiration' as keyof typeof categories,
+    category: 'respiration' as ExerciseCategoryValue,
     level: 'beginner' as const,
     duration: 6,
     intensity: 'gentle' as const,
@@ -89,14 +90,14 @@ const interactiveBreathingExercises = [
 
 // Fonction pour convertir les exercices API en format frontend
 const convertAPIExerciseToFrontend = (apiExercise: APIExercise): Exercise => {
-  const mappedCategory = categoryMapping[apiExercise.category] || apiExercise.category as Exercise['category'];
+  const mappedCategory = categoryMapping[apiExercise.category] || apiExercise.category as ExerciseCategoryValue;
   
   return {
     id: apiExercise.id,
     title: apiExercise.title,
     description: apiExercise.description || '',
     category: mappedCategory,
-    level: (apiExercise.difficulty as 'beginner' | 'intermediate' | 'advanced') || 'beginner',
+    level: (apiExercise.difficulty as DifficultyLevelValue) || 'beginner',
     duration: apiExercise.duration || 10,
     intensity: 'moderate', // Valeur par défaut, pourrait être déterminée par la durée/catégorie
     type: ['mindfulness', 'respiration', 'meditation'].includes(apiExercise.category) ? 'breathing' : 
@@ -108,28 +109,20 @@ const convertAPIExerciseToFrontend = (apiExercise: APIExercise): Exercise => {
   };
 };
 
-// Catégories et niveaux pour l'interface utilisateur - alignées avec l'admin
-const categories = {
-  cardio: 'Cardio Training',
-  strength: 'Renforcement Musculaire',
-  flexibility: 'Étirement & Flexibilité',
-  mindfulness: 'Pleine Conscience & Méditation',
-  relaxation: 'Relaxation',
-  respiration: 'Exercices de Respiration',
-  meditation: 'Méditation',
-  debutant: 'Exercices Débutant'
-} as const;
+// Catégories et niveaux importés depuis le fichier centralisé
+// Création d'objets de mapping compatibles avec l'interface existante
+const categories = Object.fromEntries(
+  EXERCISE_CATEGORIES.map(cat => [cat.value, cat.label])
+) as Record<ExerciseCategoryValue, string>;
 
 const levels = {
-  beginner: 'Débutant',
-  intermediate: 'Intermédiaire', 
-  advanced: 'Avancé',
+  ...Object.fromEntries(DIFFICULTY_LEVELS.map(level => [level.value, level.label])),
   all_levels: 'Tous niveaux'
 } as const;
 
 export default function Exercises() {
-  const [selectedCategory, setSelectedCategory] = useState<keyof typeof categories | 'all'>('all');
-  const [selectedLevel, setSelectedLevel] = useState<keyof typeof levels | 'all'>('all');
+  const [selectedCategory, setSelectedCategory] = useState<ExerciseCategoryValue | 'all'>('all');
+  const [selectedLevel, setSelectedLevel] = useState<DifficultyLevelValue | 'all_levels' | 'all'>('all');
   const [showRespirationDialog, setShowRespirationDialog] = useState(false);
   const [location] = useLocation();
   const { toast } = useToast();
@@ -154,8 +147,8 @@ export default function Exercises() {
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     const category = params.get('category');
-    if (category && categories[category as keyof typeof categories]) {
-      setSelectedCategory(category as keyof typeof categories);
+    if (category && categories[category as ExerciseCategoryValue]) {
+      setSelectedCategory(category as ExerciseCategoryValue);
     }
   }, [location.search]);
 
