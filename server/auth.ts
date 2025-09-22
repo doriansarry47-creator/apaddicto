@@ -12,12 +12,22 @@ export interface AuthUser {
 
 export class AuthService {
   static async hashPassword(password: string): Promise<string> {
-    const saltRounds = 10;
-    return bcrypt.hash(password, saltRounds);
+    try {
+      const saltRounds = 12; // Augmentation de la sécurité
+      return await bcrypt.hash(password, saltRounds);
+    } catch (error) {
+      console.error('❌ Password hashing failed:', error);
+      throw new Error('Erreur lors du hashage du mot de passe');
+    }
   }
 
   static async verifyPassword(password: string, hashedPassword: string): Promise<boolean> {
-    return bcrypt.compare(password, hashedPassword);
+    try {
+      return await bcrypt.compare(password, hashedPassword);
+    } catch (error) {
+      console.error('❌ Password verification failed:', error);
+      return false;
+    }
   }
 
   static async register(userData: {

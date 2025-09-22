@@ -8,6 +8,7 @@ import { registerRoutes } from './routes.js';
 import './migrate.js';
 import { debugTablesRouter } from './debugTables.js';
 import { Pool } from 'pg';
+import pgSession from 'connect-pg-simple';
 
 // Pour obtenir __dirname dans ES modules
 const __filename = fileURLToPath(import.meta.url);
@@ -18,9 +19,31 @@ const app = express();
 
 // === CONFIG CORS ===
 const CORS_ORIGIN = process.env.CORS_ORIGIN || '*';
+const isDevelopment = process.env.NODE_ENV === 'development';
+
 app.use(cors({
-  origin: CORS_ORIGIN === '*' ? true : CORS_ORIGIN.split(','),
+  origin: (origin, callback) => {
+    // Autoriser toutes les origines en développement
+    if (isDevelopment) return callback(null, true);
+    
+    // Autoriser les requêtes sans origine (applications mobiles)
+    if (!origin) return callback(null, true);
+    
+    // Autoriser toutes les origines si CORS_ORIGIN est '*'
+    if (CORS_ORIGIN === '*') return callback(null, true);
+    
+    // Vérifier les origines autorisées
+    const allowedOrigins = CORS_ORIGIN.split(',');
+    if (allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+    
+    console.warn(`❌ Origin not allowed by CORS: ${origin}`);
+    callback(null, false);
+  },
   credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'x-requested-with'],
 }));
 
 // === PARSING JSON ===
@@ -31,15 +54,38 @@ const distPath = path.join(__dirname, '..', 'dist');
 console.log('📁 Serving static files from:', distPath);
 app.use(express.static(distPath));
 
-// === SESSION ===
+// === CONNEXION POSTGRES ===
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
+});
+
+// Test de connexion à la base
+pool.query('SELECT NOW()', (err, res) => {
+  if (err) {
+    console.error('❌ Erreur de connexion à la base de données:', err.message);
+  } else {
+    console.log('✅ Base de données connectée:', res.rows[0].now);
+  }
+});
+
+// === SESSION AVEC POSTGRES ===
+const PgStore = pgSession(session);
+
 app.use(session({
-  secret: process.env.SESSION_SECRET || 'fallback-secret',
+  store: new PgStore({
+    pool: pool,
+    tableName: 'session',
+    createTableIfMissing: true
+  }),
+  secret: process.env.SESSION_SECRET || 'fallback-secret-dev',
   resave: false,
   saveUninitialized: false,
   cookie: {
-    sameSite: 'lax',
-    secure: false,
-    maxAge: 1000 * 60 * 60 * 24 * 7,
+    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+    secure: process.env.NODE_ENV === 'production',
+    maxAge: 1000 * 60 * 60 * 24 * 7, // 1 semaine
+    httpOnly: true
   },
 }));
 
@@ -56,10 +102,7 @@ app.get('/api/health', (_req, res) => {
 registerRoutes(app);
 app.use('/api', debugTablesRouter);
 
-// === CONNEXION POSTGRES ===
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-});
+
 
 // === ENDPOINT POUR LISTER LES TABLES ===
 app.get('/api/tables', async (_req, res) => {
@@ -82,7 +125,7 @@ app.get('/api/data', async (_req, res) => {
   try {
     const tables = [
       "beck_analyses",
-      "craving_entries",
+      "craving_entries", 
       "exercise_sessions",
       "exercises",
       "psycho_education_content",
@@ -94,14 +137,19 @@ app.get('/api/data', async (_req, res) => {
     const data: Record<string, any[]> = {};
 
     for (const table of tables) {
-      const result = await pool.query(`SELECT * FROM ${table};`);
-      data[table] = result.rows;
+      try {
+        const result = await pool.query(`SELECT * FROM ${table};`);
+        data[table] = result.rows;
+      } catch (tableErr: any) {
+        console.warn(`⚠️ Table ${table} not found, skipping...`);
+        data[table] = [];
+      }
     }
 
     res.json(data);
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: 'Erreur serveur' });
+  } catch (err: any) {
+    console.error('❌ Erreur API /data:', err);
+    res.status(500).json({ message: 'Erreur serveur', error: err.message });
   }
 });
 

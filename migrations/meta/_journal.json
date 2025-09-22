@@ -15,6 +15,13 @@
       "when": 1757276479853,
       "tag": "0001_equal_wild_pack",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1758478131685,
+      "tag": "0002_curly_otto_octavius",
+      "breakpoints": true
     }
   ]
 }

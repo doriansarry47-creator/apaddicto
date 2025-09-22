@@ -17,7 +17,15 @@ import type {
   InsertAntiCravingStrategy,
   UserStats,
   UserEmergencyRoutine,
-  InsertUserEmergencyRoutine
+  InsertUserEmergencyRoutine,
+  ExerciseVariation,
+  InsertExerciseVariation,
+  CustomSession,
+  InsertCustomSession,
+  SessionElement,
+  InsertSessionElement,
+  SessionInstance,
+  InsertSessionInstance
 } from '../shared/schema.js';
 import { 
   users, 
@@ -29,7 +37,11 @@ import {
   antiCravingStrategies,
   userStats,
   userBadges,
-  userEmergencyRoutines
+  userEmergencyRoutines,
+  exerciseVariations,
+  customSessions,
+  sessionElements,
+  sessionInstances
 } from '../shared/schema.js';
 
 class Storage {
@@ -176,17 +188,13 @@ class Storage {
     try {
       console.log('💾 Creating craving entry:', cravingData);
       
-      const insertData: InsertCravingEntry = {
+      const result = await this.db.insert(cravingEntries).values({
         userId: cravingData.userId,
         intensity: cravingData.intensity,
-        triggers: Array.isArray(cravingData.triggers) ? cravingData.triggers as string[] : [],
-        emotions: Array.isArray(cravingData.emotions) ? cravingData.emotions as string[] : [],
+        triggers: cravingData.triggers || [],
+        emotions: cravingData.emotions || [],
         notes: cravingData.notes
-      };
-      
-      console.log('💾 Processed insert data:', insertData);
-      
-      const result = await this.db.insert(cravingEntries).values(insertData).returning();
+      }).returning();
       
       if (!result || result.length === 0) {
         throw new Error('Aucune donnée retournée après insertion du craving');
@@ -515,9 +523,9 @@ class Storage {
       };
 
       // Calculs des statistiques améliorées
-      const todayAvgCraving = todaysCravings[0]?.avg || 0;
-      const yesterdayAvgCraving = yesterdaysCravings[0]?.avg || 0;
-      const todaysCravingCount = todaysCravings[0]?.count || 0;
+      const todayAvgCraving = Number(todaysCravings[0]?.avg) || 0;
+      const yesterdayAvgCraving = Number(yesterdaysCravings[0]?.avg) || 0;
+      const todaysCravingCount = Number(todaysCravings[0]?.count) || 0;
       
       // Calcul de la tendance (comparaison aujourd'hui vs hier)
       let cravingTrend = 0;
@@ -738,6 +746,242 @@ class Storage {
   }
 
   // Les méthodes getAllUsersWithStats, getUserById et deleteUser sont déjà définies plus haut
+
+  // === EXERCISE VARIATIONS ===
+  async getExerciseVariations(exerciseId: string) {
+    try {
+      const result = await this.db
+        .select()
+        .from(exerciseVariations)
+        .where(and(
+          eq(exerciseVariations.exerciseId, exerciseId),
+          eq(exerciseVariations.isActive, true)
+        ))
+        .orderBy(exerciseVariations.type, exerciseVariations.difficultyModifier);
+      return result;
+    } catch (error) {
+      console.error('Error fetching exercise variations:', error);
+      throw new Error('Failed to fetch exercise variations');
+    }
+  }
+
+  async createExerciseVariation(variationData: any) {
+    try {
+      const result = await this.db
+        .insert(exerciseVariations)
+        .values({
+          ...variationData,
+          isActive: true,
+          createdAt: new Date(),
+          updatedAt: new Date()
+        })
+        .returning();
+      return result[0];
+    } catch (error) {
+      console.error('Error creating exercise variation:', error);
+      throw new Error('Failed to create exercise variation');
+    }
+  }
+
+  // === CUSTOM SESSIONS ===
+  async getCustomSessions(userId: string) {
+    try {
+      const result = await this.db
+        .select()
+        .from(customSessions)
+        .where(
+          and(
+            eq(customSessions.isActive, true),
+            sql`(${customSessions.isPublic} = true OR ${customSessions.creatorId} = ${userId})`
+          )
+        )
+        .orderBy(desc(customSessions.createdAt));
+      return result;
+    } catch (error) {
+      console.error('Error fetching custom sessions:', error);
+      throw new Error('Failed to fetch custom sessions');
+    }
+  }
+
+  async getCustomSessionById(sessionId: string) {
+    try {
+      const result = await this.db
+        .select()
+        .from(customSessions)
+        .where(eq(customSessions.id, sessionId))
+        .limit(1);
+      return result[0] || null;
+    } catch (error) {
+      console.error('Error fetching custom session:', error);
+      throw new Error('Failed to fetch custom session');
+    }
+  }
+
+  async createCustomSession(sessionData: any) {
+    try {
+      // Extraire les exercices pour les traiter séparément
+      const { exercises, ...sessionOnly } = sessionData;
+      
+      const result = await this.db
+        .insert(customSessions)
+        .values({
+          ...sessionOnly,
+          isActive: true,
+          createdAt: new Date(),
+          updatedAt: new Date()
+        })
+        .returning();
+      return result[0];
+    } catch (error) {
+      console.error('Error creating custom session:', error);
+      throw new Error('Failed to create custom session');
+    }
+  }
+
+  async updateCustomSession(sessionId: string, updateData: any) {
+    try {
+      // Extraire les exercices pour les traiter séparément
+      const { exercises, ...sessionOnly } = updateData;
+      
+      const result = await this.db
+        .update(customSessions)
+        .set({
+          ...sessionOnly,
+          updatedAt: new Date()
+        })
+        .where(eq(customSessions.id, sessionId))
+        .returning();
+      return result[0];
+    } catch (error) {
+      console.error('Error updating custom session:', error);
+      throw new Error('Failed to update custom session');
+    }
+  }
+
+  async deleteCustomSession(sessionId: string): Promise<boolean> {
+    try {
+      // D'abord supprimer les éléments de la séance
+      await this.deleteSessionElements(sessionId);
+      
+      // Puis supprimer la séance elle-même
+      const result = await this.db
+        .delete(customSessions)
+        .where(eq(customSessions.id, sessionId))
+        .returning();
+      return result.length > 0;
+    } catch (error) {
+      console.error('Error deleting custom session:', error);
+      return false;
+    }
+  }
+
+  // === SESSION ELEMENTS ===
+  async getSessionElements(sessionId: string) {
+    try {
+      const result = await this.db
+        .select()
+        .from(sessionElements)
+        .where(eq(sessionElements.sessionId, sessionId))
+        .orderBy(sessionElements.order);
+      return result;
+    } catch (error) {
+      console.error('Error fetching session elements:', error);
+      throw new Error('Failed to fetch session elements');
+    }
+  }
+
+  async createSessionElement(elementData: any) {
+    try {
+      const result = await this.db
+        .insert(sessionElements)
+        .values({
+          ...elementData,
+          createdAt: new Date()
+        })
+        .returning();
+      return result[0];
+    } catch (error) {
+      console.error('Error creating session element:', error);
+      throw new Error('Failed to create session element');
+    }
+  }
+
+  async deleteSessionElements(sessionId: string): Promise<boolean> {
+    try {
+      await this.db
+        .delete(sessionElements)
+        .where(eq(sessionElements.sessionId, sessionId));
+      return true;
+    } catch (error) {
+      console.error('Error deleting session elements:', error);
+      return false;
+    }
+  }
+
+  // === SESSION INSTANCES ===
+  async createSessionInstance(instanceData: any) {
+    try {
+      const result = await this.db
+        .insert(sessionInstances)
+        .values({
+          ...instanceData,
+          createdAt: new Date()
+        })
+        .returning();
+      return result[0];
+    } catch (error) {
+      console.error('Error creating session instance:', error);
+      throw new Error('Failed to create session instance');
+    }
+  }
+
+  async getSessionInstanceById(instanceId: string) {
+    try {
+      const result = await this.db
+        .select()
+        .from(sessionInstances)
+        .where(eq(sessionInstances.id, instanceId))
+        .limit(1);
+      return result[0] || null;
+    } catch (error) {
+      console.error('Error fetching session instance:', error);
+      throw new Error('Failed to fetch session instance');
+    }
+  }
+
+  async updateSessionInstance(instanceId: string, updateData: any) {
+    try {
+      const result = await this.db
+        .update(sessionInstances)
+        .set(updateData)
+        .where(eq(sessionInstances.id, instanceId))
+        .returning();
+      return result[0];
+    } catch (error) {
+      console.error('Error updating session instance:', error);
+      throw new Error('Failed to update session instance');
+    }
+  }
+
+  async getSessionInstancesByUser(userId: string, limit?: number) {
+    try {
+      let query = this.db
+        .select()
+        .from(sessionInstances)
+        .where(eq(sessionInstances.userId, userId))
+        .orderBy(desc(sessionInstances.createdAt));
+      
+      if (limit) {
+        query = query.limit(limit);
+      }
+
+      const result = await query;
+      return result;
+    } catch (error) {
+      console.error('Error fetching session instances by user:', error);
+      throw new Error('Failed to fetch session instances');
+    }
+  }
 }
 
 export const storage = new Storage();
