@@ -178,9 +178,9 @@ export default function Exercises() {
         <section className="mb-8">
           <div className="flex justify-between items-center mb-2">
             <div>
-              <h1 className="text-3xl font-bold text-foreground mb-2">Bibliothèque d'Exercices</h1>
+              <h1 className="text-3xl font-bold text-foreground mb-2">Séances</h1>
               <p className="text-muted-foreground">
-                Choisissez parmi nos exercices adaptés à votre niveau et vos besoins du moment.
+                Choisissez parmi nos séances structurées adaptées à votre niveau et vos besoins du moment.
               </p>
             </div>
             <Button
@@ -262,11 +262,11 @@ export default function Exercises() {
         <section className="mb-6">
           <div className="flex items-center justify-between">
             <h2 className="text-2xl font-medium text-foreground">
-              {selectedCategory === 'all' ? 'Tous les exercices' : categories[selectedCategory as keyof typeof categories]}
+              {selectedCategory === 'all' ? 'Toutes les séances' : categories[selectedCategory as keyof typeof categories]}
               {selectedLevel !== 'all' && ` - ${levels[selectedLevel as keyof typeof levels]}`}
             </h2>
             <span className="text-sm text-muted-foreground" data-testid="text-results-count">
-              {filteredExercises.length} exercice{filteredExercises.length !== 1 ? 's' : ''}
+              {filteredExercises.length} séance{filteredExercises.length !== 1 ? 's' : ''}
             </span>
           </div>
         </section>
@@ -287,11 +287,11 @@ export default function Exercises() {
             <Card className="shadow-material" data-testid="card-no-results">
               <CardContent className="p-8 text-center">
                 <span className="material-icons text-6xl text-muted-foreground mb-4">search_off</span>
-                <h3 className="text-xl font-medium text-foreground mb-2">Aucun exercice trouvé</h3>
+                <h3 className="text-xl font-medium text-foreground mb-2">Aucune séance trouvée</h3>
                 <p className="text-muted-foreground mb-4">
                   {exercises.length === 0 ? 
-                    "Aucun exercice disponible pour le moment. Les administrateurs peuvent en ajouter via l'interface d'administration." :
-                    "Essayez de modifier vos filtres pour voir plus d'exercices."
+                    "Aucune séance disponible pour le moment. Les administrateurs peuvent en ajouter via l'interface d'administration." :
+                    "Essayez de modifier vos filtres pour voir plus de séances."
                   }
                 </p>
                 <Button

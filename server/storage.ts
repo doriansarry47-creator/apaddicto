@@ -18,6 +18,7 @@ import type {
   UserStats,
   UserEmergencyRoutine,
   InsertUserEmergencyRoutine,
+
   ExerciseVariation,
   InsertExerciseVariation,
   CustomSession,
@@ -26,6 +27,7 @@ import type {
   InsertSessionElement,
   SessionInstance,
   InsertSessionInstance
+
 } from '../shared/schema.js';
 import { 
   users, 
@@ -38,10 +40,12 @@ import {
   userStats,
   userBadges,
   userEmergencyRoutines,
+
   exerciseVariations,
   customSessions,
   sessionElements,
   sessionInstances
+
 } from '../shared/schema.js';
 
 class Storage {
@@ -743,6 +747,102 @@ class Storage {
       console.error('Error deleting emergency routine:', error);
       return false;
     }
+  }
+
+  // === CUSTOM SESSIONS ===
+  async createCustomSession(sessionData: InsertCustomSession): Promise<CustomSession> {
+    const result = await this.db.insert(customSessions).values(sessionData).returning();
+    return result[0];
+  }
+
+  async getCustomSession(id: string): Promise<CustomSession | null> {
+    const result = await this.db.select().from(customSessions).where(eq(customSessions.id, id)).limit(1);
+    return result[0] || null;
+  }
+
+  async getCustomSessionsByCreator(creatorId: string): Promise<CustomSession[]> {
+    return await this.db.select().from(customSessions)
+      .where(eq(customSessions.creatorId, creatorId))
+      .orderBy(desc(customSessions.createdAt));
+  }
+
+  async getPublishedSessions(): Promise<CustomSession[]> {
+    return await this.db.select().from(customSessions)
+      .where(eq(customSessions.status, 'published'))
+      .orderBy(desc(customSessions.publishedAt));
+  }
+
+  async updateCustomSession(id: string, data: Partial<InsertCustomSession>): Promise<CustomSession> {
+    const result = await this.db
+      .update(customSessions)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(customSessions.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async publishSession(id: string, targetAudience: string = 'all'): Promise<CustomSession> {
+    return await this.updateCustomSession(id, {
+      status: 'published',
+      publishedAt: new Date(),
+      targetAudience
+    });
+  }
+
+  // === SESSION ASSIGNMENTS ===
+  async createSessionAssignment(assignmentData: InsertSessionAssignment): Promise<SessionAssignment> {
+    const result = await this.db.insert(sessionAssignments).values(assignmentData).returning();
+    return result[0];
+  }
+
+  async getSessionAssignmentsByPatient(patientId: string): Promise<SessionAssignment[]> {
+    return await this.db.select().from(sessionAssignments)
+      .where(eq(sessionAssignments.patientId, patientId))
+      .orderBy(desc(sessionAssignments.assignedAt));
+  }
+
+  async getSessionAssignmentsByTherapist(therapistId: string): Promise<SessionAssignment[]> {
+    return await this.db.select().from(sessionAssignments)
+      .where(eq(sessionAssignments.assignedBy, therapistId))
+      .orderBy(desc(sessionAssignments.assignedAt));
+  }
+
+  async updateSessionAssignment(id: string, data: Partial<InsertSessionAssignment>): Promise<SessionAssignment> {
+    const result = await this.db
+      .update(sessionAssignments)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(sessionAssignments.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async completeSessionAssignment(id: string, feedback?: string): Promise<SessionAssignment> {
+    return await this.updateSessionAssignment(id, {
+      status: 'completed',
+      completedAt: new Date(),
+      feedback
+    });
+  }
+
+  // === SESSION ELEMENTS ===
+  async createSessionElement(elementData: InsertSessionElement): Promise<SessionElement> {
+    const result = await this.db.insert(sessionElements).values(elementData).returning();
+    return result[0];
+  }
+
+  async getSessionElements(sessionId: string): Promise<SessionElement[]> {
+    return await this.db.select().from(sessionElements)
+      .where(eq(sessionElements.sessionId, sessionId))
+      .orderBy(sessionElements.order);
+  }
+
+  async updateSessionElement(id: string, data: Partial<InsertSessionElement>): Promise<SessionElement> {
+    const result = await this.db
+      .update(sessionElements)
+      .set(data)
+      .where(eq(sessionElements.id, id))
+      .returning();
+    return result[0];
   }
 
   // Les méthodes getAllUsersWithStats, getUserById et deleteUser sont déjà définies plus haut

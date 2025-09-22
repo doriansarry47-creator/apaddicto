@@ -727,7 +727,10 @@ export default function ManageExercises() {
         <TabsContent value="library" className="mt-6">
           <div className="flex justify-between items-center mb-6">
             <h2 className="text-2xl font-semibold">Bibliothèque d'Exercices</h2>
-            <p className="text-sm text-muted-foreground">Créez des cartes d'identité complètes pour vos exercices</p>
+            <div className="text-right">
+              <p className="text-sm text-muted-foreground">Créez des cartes d'identité complètes pour vos exercices</p>
+              <p className="text-xs text-info mt-1">Tous les exercices unitaires (pompes, squats, fentes, etc.) doivent être ajoutés ici</p>
+            </div>
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -737,8 +740,20 @@ export default function ManageExercises() {
                 <CardHeader>
                   <CardTitle className="flex items-center space-x-2">
                     <Library className="h-5 w-5" />
-                    <span>Créer une Carte d'Identité</span>
+                    <span>Créer une Fiche Détaillée</span>
                   </CardTitle>
+                  <div className="text-sm text-muted-foreground space-y-1">
+                    <p>Chaque exercice doit avoir une fiche détaillée avec :</p>
+                    <ul className="text-xs space-y-1 ml-4">
+                      <li>• Nom de l'exercice</li>
+                      <li>• Description complète</li>
+                      <li>• Catégorie / type</li>
+                      <li>• Niveau de difficulté</li>
+                      <li>• Objectifs thérapeutiques</li>
+                      <li>• Durée / Intensité</li>
+                      <li>• Options variables personnalisables</li>
+                    </ul>
+                  </div>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   {/* Sélection d'exercice */}
@@ -893,6 +908,21 @@ export default function ManageExercises() {
                         <div>
                           <Label>Groupes musculaires</Label>
                           <Input placeholder="Abdominaux, dorsaux, jambes... (séparés par des virgules)" />
+                        </div>
+                        
+                        <div>
+                          <Label>Option variable 1</Label>
+                          <Input placeholder="Champ personnalisable 1 (intensité, répétitions, etc.)" />
+                        </div>
+                        
+                        <div>
+                          <Label>Option variable 2</Label>
+                          <Input placeholder="Champ personnalisable 2 (tempo, angle, etc.)" />
+                        </div>
+                        
+                        <div>
+                          <Label>Option variable 3</Label>
+                          <Input placeholder="Champ personnalisable 3 (position, accessoire, etc.)" />
                         </div>
                       </div>
 
@@ -1072,10 +1102,13 @@ export default function ManageExercises() {
                         Commencez par sélectionner un exercice et créez sa première carte d'identité complète.
                       </p>
                       <div className="bg-info/10 p-4 rounded-lg max-w-md mx-auto">
-                        <p className="text-sm text-info font-medium mb-2">💡 Conseil :</p>
+                        <p className="text-sm text-info font-medium mb-2">💡 Préparation future :</p>
+                        <p className="text-xs text-muted-foreground mb-2">
+                          Les exercices de la bibliothèque serviront de base pour créer des séances structurées.
+                        </p>
                         <p className="text-xs text-muted-foreground">
-                          Les cartes d'identité enrichissent vos exercices avec des images, vidéos, variations 
-                          et métadonnées détaillées pour offrir une meilleure expérience aux patients.
+                          Chaque fiche détaillée enrichit l'expérience avec images, vidéos, variations 
+                          et métadonnées pour assurer la cohérence entre Séances (patients) et Bibliothèque d'exercices (admin).
                         </p>
                       </div>
                     </div>

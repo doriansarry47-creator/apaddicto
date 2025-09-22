@@ -18,6 +18,7 @@ const __dirname = path.dirname(__filename);
 const app = express();
 
 // === CONFIG CORS ===
+
 const CORS_ORIGIN = process.env.CORS_ORIGIN || '*';
 const isDevelopment = process.env.NODE_ENV === 'development';
 
@@ -40,6 +41,7 @@ app.use(cors({
     
     console.warn(`❌ Origin not allowed by CORS: ${origin}`);
     callback(null, false);
+
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
@@ -57,6 +59,7 @@ app.use(express.static(distPath));
 // === CONNEXION POSTGRES ===
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
+
   ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
 });
 
@@ -70,10 +73,12 @@ pool.query('SELECT NOW()', (err, res) => {
 });
 
 // === SESSION AVEC POSTGRES ===
+
 const PgStore = pgSession(session);
 
 app.use(session({
   store: new PgStore({
+
     pool: pool,
     tableName: 'session',
     createTableIfMissing: true
@@ -86,6 +91,7 @@ app.use(session({
     secure: process.env.NODE_ENV === 'production',
     maxAge: 1000 * 60 * 60 * 24 * 7, // 1 semaine
     httpOnly: true
+
   },
 }));
 
@@ -101,7 +107,6 @@ app.get('/api/health', (_req, res) => {
 // === ROUTES DE L'APPLICATION ===
 registerRoutes(app);
 app.use('/api', debugTablesRouter);
-
 
 
 // === ENDPOINT POUR LISTER LES TABLES ===
@@ -154,9 +159,13 @@ app.get('/api/data', async (_req, res) => {
 });
 
 // === MIDDLEWARE DE GESTION D'ERREURS ===
-app.use((err: any, _req: any, res: any, _next: any) => {
-  console.error('❌ Erreur serveur:', err);
-  res.status(500).json({ message: 'Erreur interne' });
+app.use((err: any, req: any, res: any, next: any) => {
+  console.error('❌ Erreur serveur:', err.stack || err);
+  if (process.env.NODE_ENV === 'production') {
+    res.status(500).json({ message: 'Une erreur interne est survenue.' });
+  } else {
+    res.status(500).json({ message: err.message, stack: err.stack });
+  }
 });
 
 // === FALLBACK POUR SPA (Single Page Application) ===
@@ -178,3 +187,5 @@ const port = process.env.PORT || 3000;
 app.listen(port, '0.0.0.0', () => {
   console.log(`🚀 Server running at http://localhost:${port}`);
 });
+
+

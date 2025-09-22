@@ -1,0 +1,87 @@
+Création et publication de séances pour les patients
+
+Actuellement, l’admin peut créer des exercices et séances, mais il faut un système pour les publier vers les patients.
+
+Fonctionnalités à ajouter :
+
+Bouton "Publier" sur une séance créée → envoie vers la base.
+
+Choix des destinataires : tous les patients, un groupe, ou un patient spécifique.
+
+Planification (immédiat ou avec date/heure).
+
+👉 Cela permet de transformer une séance admin en contenu disponible dans l’onglet Séances côté patient.
+
+2. Assignation personnalisée des séances
+
+Dans patient-session-editor.tsx ou via un nouvel écran :
+
+L’admin doit pouvoir assigner une séance à un patient donné.
+
+Les patients voient uniquement ce qui leur est assigné (ou ce qui est en accès libre).
+
+Option : assigner un programme récurrent (ex : 3 séances/semaine).
+
+3. Gestion des statuts des séances
+
+Chaque séance publiée devrait avoir un statut :
+
+Brouillon (admin seulement)
+
+Publié (visible patient)
+
+Archivé (historique)
+
+Ça évite que les patients voient des tests ou brouillons.
+
+4. Catégorisation des contenus
+
+Ajouter la possibilité de taguer les séances et exercices :
+
+APA, addictologie, relaxation, cardio, muscu, etc.
+
+Permet d’afficher un filtre côté patient (par objectif, niveau, durée).
+
+5. Suivi des séances réalisées
+
+Actuellement, un patient peut sûrement "consommer" une séance, mais l’admin doit avoir un feedback :
+
+Qui a réalisé la séance ?
+
+Date / durée / intensité perçue ?
+
+Progression du patient.
+
+Ça peut s’appuyer sur une table PatientSession qui lie Patient ↔ Session.
+
+6. Variables dynamiques dans les exercices
+
+Tu as déjà prévu variable1, 2, 3.
+
+Manque : côté Admin, il faut pouvoir remplir ces variables (ex : nombre de répétitions, durée, intensité) et côté Patient, ça doit s’afficher de manière personnalisée.
+
+7. Médiathèque (bonus évolutif)
+
+Permettre à l’admin d’ajouter :
+
+Des vidéos d’exécution
+
+Des images de démonstration
+
+Des audios pour les séances de relaxation.
+
+Et les associer aux exercices → ça enrichit l’expérience patient.
+
+📌 Synthèse → Manques à combler
+
+ Publication / assignation des séances aux patients
+
+ Statut des séances (brouillon, publié, archivé)
+
+ Filtres/catégories visibles côté patient
+
+ Suivi des séances réalisées par patient
+
+ Gestion et affichage des variables personnalisées (répétitions, durée, intensité)
+
+ (Bonus) Médiathèque pour enrichir les exercices

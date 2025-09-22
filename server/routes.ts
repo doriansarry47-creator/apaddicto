@@ -304,30 +304,15 @@ export function registerRoutes(app: Application) {
   app.post('/api/exercise-sessions', requireAuth, async (req, res) => {
     try {
       const { exerciseId, duration, completed, notes, cravingBefore, cravingAfter } = req.body;
-      
-      // Vérifier si l'exercice existe si un exerciseId est fourni
-      let validExerciseId = exerciseId;
+            let validExerciseId = exerciseId;
       if (exerciseId) {
         const exercise = await storage.getExerciseById(exerciseId);
         if (!exercise) {
-          // Si l'exercice n'existe pas, utiliser le premier exercice disponible
-          const exercises = await storage.getAllExercises();
-          if (exercises.length > 0) {
-            validExerciseId = exercises[0].id;
-          } else {
-            return res.status(400).json({ message: 'Aucun exercice disponible dans la base de données' });
-          }
+          return res.status(404).json({ message: \'Exercice non trouvé\' });
         }
       } else {
-        // Si aucun exerciceId fourni, utiliser le premier exercice disponible
-        const exercises = await storage.getAllExercises();
-        if (exercises.length > 0) {
-          validExerciseId = exercises[0].id;
-        } else {
-          return res.status(400).json({ message: 'Aucun exercice disponible dans la base de données' });
-        }
-      }
-      
+        return res.status(400).json({ message: \'exerciseId est requis pour créer une session\' });
+      } 
       const session = await storage.createExerciseSession({
         userId: req.session.user!.id,
         exerciseId: validExerciseId,
@@ -750,6 +735,7 @@ export function registerRoutes(app: Application) {
     }
   });
 
+
   // === ROUTES DES VARIATIONS D'EXERCICES ===
   
   // GET /api/exercises/:id/variations - Récupérer les variations d'un exercice
@@ -1083,6 +1069,220 @@ export function registerRoutes(app: Application) {
     } catch (error: any) {
       console.error('Error fetching session instances:', error);
       res.status(500).json({ message: 'Erreur lors de la récupération de l\'historique' });
+=======
+  // === ROUTES DES SESSIONS PERSONNALISÉES ===
+  
+  // POST /api/custom-sessions - Créer une session personnalisée
+  app.post('/api/custom-sessions', requireAuth, async (req, res) => {
+    try {
+      // Vérifier le rôle (admin ou thérapeute)
+      if (req.session.user.role !== 'admin' && req.session.user.role !== 'therapist') {
+        return res.status(403).json({ message: 'Accès refusé - rôle requis: admin ou thérapeute' });
+      }
+      
+      // Validation des données
+      if (!req.body.title || !req.body.category) {
+        return res.status(400).json({ message: 'Titre et catégorie requis' });
+      }
+      
+      const sessionData = {
+        ...req.body,
+        creatorId: req.session.user.id
+      };
+      const session = await storage.createCustomSession(sessionData);
+      res.json(session);
+    } catch (error: any) {
+      console.error('Error creating custom session:', error);
+      res.status(500).json({ message: 'Erreur lors de la création de la session' });
+    }
+  });
+
+  // GET /api/custom-sessions - Récupérer mes sessions
+  app.get('/api/custom-sessions', requireAuth, async (req, res) => {
+    try {
+      const sessions = await storage.getCustomSessionsByCreator(req.session.user.id);
+      res.json(sessions);
+    } catch (error: any) {
+      console.error('Error fetching custom sessions:', error);
+      res.status(500).json({ message: 'Erreur lors de la récupération des sessions' });
+    }
+  });
+
+  // GET /api/custom-sessions/published - Récupérer les sessions publiées
+  app.get('/api/custom-sessions/published', requireAuth, async (req, res) => {
+    try {
+      const sessions = await storage.getPublishedSessions();
+      res.json(sessions);
+    } catch (error: any) {
+      console.error('Error fetching published sessions:', error);
+      res.status(500).json({ message: 'Erreur lors de la récupération des sessions publiées' });
+    }
+  });
+
+  // PUT /api/custom-sessions/:id/publish - Publier une session
+  app.put('/api/custom-sessions/:id/publish', requireAuth, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { targetAudience = 'all' } = req.body;
+      
+      // Vérifier que la session appartient à l'utilisateur
+      const session = await storage.getCustomSession(id);
+      if (!session || session.creatorId !== req.session.user.id) {
+        return res.status(403).json({ message: 'Session non trouvée ou accès refusé' });
+      }
+      
+      const publishedSession = await storage.publishSession(id, targetAudience);
+      res.json(publishedSession);
+    } catch (error: any) {
+      console.error('Error publishing session:', error);
+      res.status(500).json({ message: 'Erreur lors de la publication de la session' });
+    }
+  });
+
+  // PUT /api/custom-sessions/:id - Mettre à jour une session
+  app.put('/api/custom-sessions/:id', requireAuth, async (req, res) => {
+    try {
+      const { id } = req.params;
+      
+      // Vérifier que la session appartient à l'utilisateur
+      const session = await storage.getCustomSession(id);
+      if (!session || session.creatorId !== req.session.user.id) {
+        return res.status(403).json({ message: 'Session non trouvée ou accès refusé' });
+      }
+      
+      const updatedSession = await storage.updateCustomSession(id, req.body);
+      res.json(updatedSession);
+    } catch (error: any) {
+      console.error('Error updating custom session:', error);
+      res.status(500).json({ message: 'Erreur lors de la mise à jour de la session' });
+    }
+  });
+
+  // === ROUTES DES ASSIGNATIONS DE SESSIONS ===
+  
+  // POST /api/session-assignments - Assigner une session à un patient
+  app.post('/api/session-assignments', requireAuth, async (req, res) => {
+    try {
+      // Vérifier le rôle (admin ou thérapeute)
+      if (req.session.user.role !== 'admin' && req.session.user.role !== 'therapist') {
+        return res.status(403).json({ message: 'Accès refusé - rôle requis: admin ou thérapeute' });
+      }
+      
+      const { sessionId, patientId } = req.body;
+      
+      // Validation des données requises
+      if (!sessionId || !patientId) {
+        return res.status(400).json({ message: 'sessionId et patientId requis' });
+      }
+      
+      // Vérifier que la session existe et est publiée
+      const session = await storage.getCustomSession(sessionId);
+      if (!session) {
+        return res.status(404).json({ message: 'Session non trouvée' });
+      }
+      if (session.status !== 'published') {
+        return res.status(400).json({ message: 'Seules les sessions publiées peuvent être assignées' });
+      }
+      
+      // Vérifier que le patient existe
+      const patient = await storage.getUser(patientId);
+      if (!patient) {
+        return res.status(404).json({ message: 'Patient non trouvé' });
+      }
+      if (patient.role !== 'patient') {
+        return res.status(400).json({ message: 'L\'utilisateur doit avoir le rôle patient' });
+      }
+      
+      const assignmentData = {
+        ...req.body,
+        assignedBy: req.session.user.id
+      };
+      const assignment = await storage.createSessionAssignment(assignmentData);
+      res.json(assignment);
+    } catch (error: any) {
+      console.error('Error creating session assignment:', error);
+      res.status(500).json({ message: 'Erreur lors de l\'assignation de la session' });
+    }
+  });
+
+  // GET /api/session-assignments/patient - Mes sessions assignées (patient)
+  app.get('/api/session-assignments/patient', requireAuth, async (req, res) => {
+    try {
+      const assignments = await storage.getSessionAssignmentsByPatient(req.session.user.id);
+      res.json(assignments);
+    } catch (error: any) {
+      console.error('Error fetching patient assignments:', error);
+      res.status(500).json({ message: 'Erreur lors de la récupération des assignations' });
+    }
+  });
+
+  // GET /api/session-assignments/therapist - Sessions que j'ai assignées (thérapeute)
+  app.get('/api/session-assignments/therapist', requireAuth, async (req, res) => {
+    try {
+      const assignments = await storage.getSessionAssignmentsByTherapist(req.session.user.id);
+      res.json(assignments);
+    } catch (error: any) {
+      console.error('Error fetching therapist assignments:', error);
+      res.status(500).json({ message: 'Erreur lors de la récupération des assignations' });
+    }
+  });
+
+  // PUT /api/session-assignments/:id/complete - Marquer une assignation comme complétée
+  app.put('/api/session-assignments/:id/complete', requireAuth, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { feedback } = req.body;
+      
+      // Récupérer l'assignation pour vérifier les permissions
+      const assignments = await storage.getSessionAssignmentsByPatient(req.session.user.id);
+      const assignment = assignments.find(a => a.id === id);
+      
+      if (!assignment) {
+        return res.status(404).json({ message: 'Assignation non trouvée ou accès refusé' });
+      }
+      
+      const completedAssignment = await storage.completeSessionAssignment(id, feedback);
+      res.json(completedAssignment);
+    } catch (error: any) {
+      console.error('Error completing session assignment:', error);
+      res.status(500).json({ message: 'Erreur lors de la finalisation de l\'assignation' });
+    }
+  });
+
+  // === ROUTES DES ÉLÉMENTS DE SESSIONS ===
+  
+  // GET /api/session-elements/:sessionId - Récupérer les éléments d'une session
+  app.get('/api/session-elements/:sessionId', requireAuth, async (req, res) => {
+    try {
+      const { sessionId } = req.params;
+      const elements = await storage.getSessionElements(sessionId);
+      res.json(elements);
+    } catch (error: any) {
+      console.error('Error fetching session elements:', error);
+      res.status(500).json({ message: 'Erreur lors de la récupération des éléments de session' });
+    }
+  });
+
+  // POST /api/session-elements - Créer un élément de session
+  app.post('/api/session-elements', requireAuth, async (req, res) => {
+    try {
+      const element = await storage.createSessionElement(req.body);
+      res.json(element);
+    } catch (error: any) {
+      console.error('Error creating session element:', error);
+      res.status(500).json({ message: 'Erreur lors de la création de l\'élément de session' });
+    }
+  });
+
+  // PUT /api/session-elements/:id - Mettre à jour un élément de session
+  app.put('/api/session-elements/:id', requireAuth, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const element = await storage.updateSessionElement(id, req.body);
+      res.json(element);
+    } catch (error: any) {
+      console.error('Error updating session element:', error);
+      res.status(500).json({ message: 'Erreur lors de la mise à jour de l\'élément de session' });
     }
   });
 

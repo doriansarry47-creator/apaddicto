@@ -1,0 +1,3 @@
+-- Migration placeholder pour réparer l'historique des migrations
+-- Cette migration est vide car les changements ont été appliqués via db:push --force
+-- No-op migration to repair migration history
