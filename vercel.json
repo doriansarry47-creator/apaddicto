@@ -2,24 +2,18 @@
   "version": 2,
   "builds": [
     {
-      "src": "client/index.html",
+      "src": "package.json",
       "use": "@vercel/static-build",
       "config": {
-        "distDir": "client/dist"
-      }
-    },
-    {
-      "src": "server-dist/index.js",
-      "use": "@vercel/node",
-      "config": {
-        "maxDuration": 30
+        "distDir": "dist",
+        "buildCommand": "npm run build:client"
       }
     }
   ],
   "routes": [
     {
       "src": "/api/(.*)",
-      "dest": "server-dist/index.js",
+      "dest": "/api/serverless.js",
       "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"]
     },
     {
@@ -27,7 +21,7 @@
     },
     {
       "src": "/(.*)",
-      "dest": "client/dist/index.html"
+      "dest": "/dist/index.html"
     }
   ],
   "headers": [
@@ -55,6 +49,11 @@
   ],
   "env": {
     "NODE_ENV": "production"
+  },
+  "functions": {
+    "api/*.js": {
+      "maxDuration": 30
+    }
   }
 }
 

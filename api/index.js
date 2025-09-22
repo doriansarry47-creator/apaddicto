@@ -2,7 +2,10 @@
 console.log('🔍 Checking environment variables...');
 if (!process.env.DATABASE_URL) {
   console.error('❌ DATABASE_URL is required');
-  process.exit(1);
+  // En développement, ne pas quitter le processus
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error('DATABASE_URL is required');
+  }
 }
 if (!process.env.SESSION_SECRET) {
   console.warn('⚠️ SESSION_SECRET not set, using fallback');
