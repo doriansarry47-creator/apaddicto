@@ -364,6 +364,11 @@ export const customSessions = pgTable("custom_sessions", {
   difficulty: varchar("difficulty").default("beginner"),
   isTemplate: boolean("is_template").default(true), // template ou séance personnelle
   isPublic: boolean("is_public").default(false), // visible pour tous les patients
+  // Nouveaux champs pour la publication et planification
+  status: varchar("status").default("draft"), // 'draft', 'published', 'archived'
+  publishedAt: timestamp("published_at"),
+  scheduledFor: timestamp("scheduled_for"), // pour la planification
+  targetAudience: varchar("target_audience").default("all"), // 'all', 'specific', 'group'
   tags: jsonb("tags").$type<string[]>().default([]),
   imageUrl: varchar("image_url"),
   isActive: boolean("is_active").default(true),
@@ -380,8 +385,11 @@ export const sessionElements = pgTable("session_elements", {
   order: integer("order").notNull(), // ordre dans la séance
   duration: integer("duration"), // durée spécifique pour cette séance (peut override l'exercice)
   repetitions: integer("repetitions").default(1),
+  sets: integer("sets").default(1), // nombre de séries
+  intensity: integer("intensity").default(5), // intensité 1-10
   restTime: integer("rest_time").default(0), // temps de repos après en secondes
   timerSettings: jsonb("timer_settings"), // configuration timer spécifique
+  dynamicVariables: jsonb("dynamic_variables").$type<{[key: string]: string | number}>().default({}), // variables personnalisables
   notes: text("notes"), // notes spécifiques pour cet élément
   isOptional: boolean("is_optional").default(false),
   createdAt: timestamp("created_at").defaultNow(),
@@ -404,6 +412,26 @@ export const sessionInstances = pgTable("session_instances", {
   startedAt: timestamp("started_at").defaultNow(),
   completedAt: timestamp("completed_at"),
   createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Assignation de séances aux patients spécifiques
+export const sessionAssignments = pgTable("session_assignments", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  sessionId: varchar("session_id").notNull().references(() => customSessions.id, { onDelete: 'cascade' }),
+  patientId: varchar("patient_id").notNull().references(() => users.id, { onDelete: 'cascade' }),
+  assignedBy: varchar("assigned_by").notNull().references(() => users.id), // admin qui assigne
+  assignedAt: timestamp("assigned_at").defaultNow(),
+  dueDate: timestamp("due_date"), // date limite pour compléter
+  priority: varchar("priority").default("normal"), // 'low', 'normal', 'high', 'urgent'
+  instructions: text("instructions"), // instructions spécifiques pour ce patient
+  isRecurring: boolean("is_recurring").default(false), // séance récurrente
+  recurringPattern: jsonb("recurring_pattern"), // configuration de récurrence (ex: 3x/semaine)
+  status: varchar("status").default("assigned"), // 'assigned', 'started', 'completed', 'missed', 'canceled'
+  completedAt: timestamp("completed_at"),
+  feedback: text("feedback"), // retour du patient après completion
+  adminNotes: text("admin_notes"), // notes privées de l'admin
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
 });
 
 // Bibliothèque d'exercices (métadonnées enrichies)
@@ -482,6 +510,12 @@ export const insertExerciseRatingSchema = createInsertSchema(exerciseRatings).om
   updatedAt: true,
 });
 
+export const insertSessionAssignmentSchema = createInsertSchema(sessionAssignments).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
 // Types
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
@@ -526,6 +560,8 @@ export type ExerciseLibrary = typeof exerciseLibrary.$inferSelect;
 export type InsertExerciseLibrary = z.infer<typeof insertExerciseLibrarySchema>;
 export type ExerciseRating = typeof exerciseRatings.$inferSelect;
 export type InsertExerciseRating = z.infer<typeof insertExerciseRatingSchema>;
+export type SessionAssignment = typeof sessionAssignments.$inferSelect;
+export type InsertSessionAssignment = z.infer<typeof insertSessionAssignmentSchema>;
 
 // User emergency routines (personalised routines by users)
 export const userEmergencyRoutines = pgTable("user_emergency_routines", {
