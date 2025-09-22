@@ -304,30 +304,15 @@ export function registerRoutes(app: Application) {
   app.post('/api/exercise-sessions', requireAuth, async (req, res) => {
     try {
       const { exerciseId, duration, completed, notes, cravingBefore, cravingAfter } = req.body;
-      
-      // Vérifier si l'exercice existe si un exerciseId est fourni
-      let validExerciseId = exerciseId;
+            let validExerciseId = exerciseId;
       if (exerciseId) {
         const exercise = await storage.getExerciseById(exerciseId);
         if (!exercise) {
-          // Si l'exercice n'existe pas, utiliser le premier exercice disponible
-          const exercises = await storage.getAllExercises();
-          if (exercises.length > 0) {
-            validExerciseId = exercises[0].id;
-          } else {
-            return res.status(400).json({ message: 'Aucun exercice disponible dans la base de données' });
-          }
+          return res.status(404).json({ message: \'Exercice non trouvé\' });
         }
       } else {
-        // Si aucun exerciceId fourni, utiliser le premier exercice disponible
-        const exercises = await storage.getAllExercises();
-        if (exercises.length > 0) {
-          validExerciseId = exercises[0].id;
-        } else {
-          return res.status(400).json({ message: 'Aucun exercice disponible dans la base de données' });
-        }
-      }
-      
+        return res.status(400).json({ message: \'exerciseId est requis pour créer une session\' });
+      } 
       const session = await storage.createExerciseSession({
         userId: req.session.user.id,
         exerciseId: validExerciseId,
