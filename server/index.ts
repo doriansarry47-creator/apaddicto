@@ -8,6 +8,7 @@ import { registerRoutes } from './routes.js';
 import './migrate.js';
 import { debugTablesRouter } from './debugTables.js';
 import { Pool } from 'pg';
+import pgSession from 'connect-pg-simple';
 
 // Pour obtenir __dirname dans ES modules
 const __filename = fileURLToPath(import.meta.url);
@@ -17,9 +18,19 @@ const __dirname = path.dirname(__filename);
 const app = express();
 
 // === CONFIG CORS ===
-const CORS_ORIGIN = process.env.CORS_ORIGIN || '*';
+const CORS_ORIGIN = process.env.CORS_ORIGIN;
+const allowedOrigins = CORS_ORIGIN ? CORS_ORIGIN.split(',') : [];
+
 app.use(cors({
-  origin: CORS_ORIGIN === '*' ? true : CORS_ORIGIN.split(','),
+  origin: (origin, callback) => {
+    // Autoriser les requêtes sans origine (comme les applications mobiles ou les requêtes curl)
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.indexOf(origin) === -1) {
+      const msg = 'The CORS policy for this site does not allow access from the specified Origin.';
+      return callback(new Error(msg), false);
+    }
+    return callback(null, true);
+  },
   credentials: true,
 }));
 
@@ -31,15 +42,27 @@ const distPath = path.join(__dirname, '..', 'dist');
 console.log('📁 Serving static files from:', distPath);
 app.use(express.static(distPath));
 
-// === SESSION ===
+// === CONNEXION POSTGRES ===
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+});
+
+// === CONFIGURATION DE LA SESSION ===
+const PgStore = pgSession(session);
+
 app.use(session({
-  secret: process.env.SESSION_SECRET || 'fallback-secret',
+  store: new PgStore({
+    pool: pool,                // Connexion à la base de données PostgreSQL
+    tableName: 'session',      // Nom de la table pour stocker les sessions
+  }),
+  secret: process.env.SESSION_SECRET || 'super_secret_fallback_key_DO_NOT_USE_IN_PROD',
   resave: false,
   saveUninitialized: false,
   cookie: {
+    maxAge: 1000 * 60 * 60 * 24 * 7, // 1 semaine
+    secure: process.env.NODE_ENV === 'production', // true en production (HTTPS), false en dev
+    httpOnly: true,
     sameSite: 'lax',
-    secure: false,
-    maxAge: 1000 * 60 * 60 * 24 * 7,
   },
 }));
 
@@ -55,11 +78,6 @@ app.get('/api/health', (_req, res) => {
 // === ROUTES DE L'APPLICATION ===
 registerRoutes(app);
 app.use('/api', debugTablesRouter);
-
-// === CONNEXION POSTGRES ===
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-});
 
 // === ENDPOINT POUR LISTER LES TABLES ===
 app.get('/api/tables', async (_req, res) => {
@@ -106,9 +124,13 @@ app.get('/api/data', async (_req, res) => {
 });
 
 // === MIDDLEWARE DE GESTION D'ERREURS ===
-app.use((err: any, _req: any, res: any, _next: any) => {
-  console.error('❌ Erreur serveur:', err);
-  res.status(500).json({ message: 'Erreur interne' });
+app.use((err: any, req: any, res: any, next: any) => {
+  console.error('❌ Erreur serveur:', err.stack || err);
+  if (process.env.NODE_ENV === 'production') {
+    res.status(500).json({ message: 'Une erreur interne est survenue.' });
+  } else {
+    res.status(500).json({ message: err.message, stack: err.stack });
+  }
 });
 
 // === FALLBACK POUR SPA (Single Page Application) ===
@@ -130,3 +152,5 @@ const port = process.env.PORT || 3000;
 app.listen(port, '0.0.0.0', () => {
   console.log(`🚀 Server running at http://localhost:${port}`);
 });
+
+
