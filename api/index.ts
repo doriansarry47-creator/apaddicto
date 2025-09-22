@@ -1,4 +1,3 @@
-// api/index.ts - Vercel Serverless Function Entry Point
 import 'dotenv/config';
 import express from 'express';
 import session from 'express-session';
@@ -57,4 +56,8 @@ app.use((err: any, _req: any, res: any, _next: any) => {
 });
 
 // Export par défaut pour Vercel
-export default app;
+// Vercel s'attend à une fonction handler pour les fonctions serverless
+export default function handler(req: VercelRequest, res: VercelResponse) {
+  return app(req, res);
+}
+
