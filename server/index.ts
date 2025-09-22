@@ -18,20 +18,34 @@ const __dirname = path.dirname(__filename);
 const app = express();
 
 // === CONFIG CORS ===
-const CORS_ORIGIN = process.env.CORS_ORIGIN;
-const allowedOrigins = CORS_ORIGIN ? CORS_ORIGIN.split(',') : [];
+
+const CORS_ORIGIN = process.env.CORS_ORIGIN || '*';
+const isDevelopment = process.env.NODE_ENV === 'development';
 
 app.use(cors({
   origin: (origin, callback) => {
-    // Autoriser les requêtes sans origine (comme les applications mobiles ou les requêtes curl)
+    // Autoriser toutes les origines en développement
+    if (isDevelopment) return callback(null, true);
+    
+    // Autoriser les requêtes sans origine (applications mobiles)
     if (!origin) return callback(null, true);
-    if (allowedOrigins.indexOf(origin) === -1) {
-      const msg = 'The CORS policy for this site does not allow access from the specified Origin.';
-      return callback(new Error(msg), false);
+    
+    // Autoriser toutes les origines si CORS_ORIGIN est '*'
+    if (CORS_ORIGIN === '*') return callback(null, true);
+    
+    // Vérifier les origines autorisées
+    const allowedOrigins = CORS_ORIGIN.split(',');
+    if (allowedOrigins.includes(origin)) {
+      return callback(null, true);
     }
-    return callback(null, true);
+    
+    console.warn(`❌ Origin not allowed by CORS: ${origin}`);
+    callback(null, false);
+
   },
   credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'x-requested-with'],
 }));
 
 // === PARSING JSON ===
@@ -45,24 +59,39 @@ app.use(express.static(distPath));
 // === CONNEXION POSTGRES ===
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
+
+  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
 });
 
-// === CONFIGURATION DE LA SESSION ===
+// Test de connexion à la base
+pool.query('SELECT NOW()', (err, res) => {
+  if (err) {
+    console.error('❌ Erreur de connexion à la base de données:', err.message);
+  } else {
+    console.log('✅ Base de données connectée:', res.rows[0].now);
+  }
+});
+
+// === SESSION AVEC POSTGRES ===
+
 const PgStore = pgSession(session);
 
 app.use(session({
   store: new PgStore({
-    pool: pool,                // Connexion à la base de données PostgreSQL
-    tableName: 'session',      // Nom de la table pour stocker les sessions
+
+    pool: pool,
+    tableName: 'session',
+    createTableIfMissing: true
   }),
-  secret: process.env.SESSION_SECRET || 'super_secret_fallback_key_DO_NOT_USE_IN_PROD',
+  secret: process.env.SESSION_SECRET || 'fallback-secret-dev',
   resave: false,
   saveUninitialized: false,
   cookie: {
+    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+    secure: process.env.NODE_ENV === 'production',
     maxAge: 1000 * 60 * 60 * 24 * 7, // 1 semaine
-    secure: process.env.NODE_ENV === 'production', // true en production (HTTPS), false en dev
-    httpOnly: true,
-    sameSite: 'lax',
+    httpOnly: true
+
   },
 }));
 
@@ -78,6 +107,7 @@ app.get('/api/health', (_req, res) => {
 // === ROUTES DE L'APPLICATION ===
 registerRoutes(app);
 app.use('/api', debugTablesRouter);
+
 
 // === ENDPOINT POUR LISTER LES TABLES ===
 app.get('/api/tables', async (_req, res) => {
@@ -100,7 +130,7 @@ app.get('/api/data', async (_req, res) => {
   try {
     const tables = [
       "beck_analyses",
-      "craving_entries",
+      "craving_entries", 
       "exercise_sessions",
       "exercises",
       "psycho_education_content",
@@ -112,14 +142,19 @@ app.get('/api/data', async (_req, res) => {
     const data: Record<string, any[]> = {};
 
     for (const table of tables) {
-      const result = await pool.query(`SELECT * FROM ${table};`);
-      data[table] = result.rows;
+      try {
+        const result = await pool.query(`SELECT * FROM ${table};`);
+        data[table] = result.rows;
+      } catch (tableErr: any) {
+        console.warn(`⚠️ Table ${table} not found, skipping...`);
+        data[table] = [];
+      }
     }
 
     res.json(data);
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: 'Erreur serveur' });
+  } catch (err: any) {
+    console.error('❌ Erreur API /data:', err);
+    res.status(500).json({ message: 'Erreur serveur', error: err.message });
   }
 });
 

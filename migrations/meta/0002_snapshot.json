@@ -1,5 +1,6 @@
 {
-  "id": "76a9e1ac-71e7-4159-a01e-0ffd2471a4cf",
+
+  "id": "5589c704-90d3-40de-9f20-a8a0cc0d00a5",
   "prevId": "a5cd456a-f8ab-4a80-bd8f-7900e3acad29",
   "version": "7",
   "dialect": "postgresql",
@@ -422,6 +423,7 @@
           "notNull": false,
           "default": false
         },
+
         "status": {
           "name": "status",
           "type": "varchar",
@@ -1589,6 +1591,7 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
+
     "public.session_assignments": {
       "name": "session_assignments",
       "schema": "",
@@ -1793,6 +1796,7 @@
           "notNull": false,
           "default": 1
         },
+
         "sets": {
           "name": "sets",
           "type": "integer",
@@ -1819,7 +1823,7 @@
           "type": "jsonb",
           "primaryKey": false,
           "notNull": false
-        },
+   },
         "dynamic_variables": {
           "name": "dynamic_variables",
           "type": "jsonb",
@@ -1827,6 +1831,7 @@
           "notNull": false,
           "default": "'{}'::jsonb"
         },
+
         "notes": {
           "name": "notes",
           "type": "text",
