@@ -52,6 +52,7 @@ __export(schema_exports, {
   insertProfessionalReportSchema: () => insertProfessionalReportSchema,
   insertPsychoEducationContentSchema: () => insertPsychoEducationContentSchema,
   insertQuickResourceSchema: () => insertQuickResourceSchema,
+  insertSessionAssignmentSchema: () => insertSessionAssignmentSchema,
   insertSessionElementSchema: () => insertSessionElementSchema,
   insertSessionInstanceSchema: () => insertSessionInstanceSchema,
   insertTimerSessionSchema: () => insertTimerSessionSchema,
@@ -62,6 +63,7 @@ __export(schema_exports, {
   professionalReports: () => professionalReports,
   psychoEducationContent: () => psychoEducationContent,
   quickResources: () => quickResources,
+  sessionAssignments: () => sessionAssignments2,
   sessionElements: () => sessionElements,
   sessionInstances: () => sessionInstances,
   timerSessions: () => timerSessions,
@@ -438,6 +440,14 @@ var customSessions = pgTable("custom_sessions", {
   // template ou séance personnelle
   isPublic: boolean("is_public").default(false),
   // visible pour tous les patients
+  // Nouveaux champs pour la publication et planification
+  status: varchar("status").default("draft"),
+  // 'draft', 'published', 'archived'
+  publishedAt: timestamp("published_at"),
+  scheduledFor: timestamp("scheduled_for"),
+  // pour la planification
+  targetAudience: varchar("target_audience").default("all"),
+  // 'all', 'specific', 'group'
   tags: jsonb("tags").$type().default([]),
   imageUrl: varchar("image_url"),
   isActive: boolean("is_active").default(true),
@@ -454,10 +464,16 @@ var sessionElements = pgTable("session_elements", {
   duration: integer("duration"),
   // durée spécifique pour cette séance (peut override l'exercice)
   repetitions: integer("repetitions").default(1),
+  sets: integer("sets").default(1),
+  // nombre de séries
+  intensity: integer("intensity").default(5),
+  // intensité 1-10
   restTime: integer("rest_time").default(0),
   // temps de repos après en secondes
   timerSettings: jsonb("timer_settings"),
   // configuration timer spécifique
+  dynamicVariables: jsonb("dynamic_variables").$type().default({}),
+  // variables personnalisables
   notes: text("notes"),
   // notes spécifiques pour cet élément
   isOptional: boolean("is_optional").default(false),
@@ -484,6 +500,33 @@ var sessionInstances = pgTable("session_instances", {
   startedAt: timestamp("started_at").defaultNow(),
   completedAt: timestamp("completed_at"),
   createdAt: timestamp("created_at").defaultNow()
+});
+var sessionAssignments2 = pgTable("session_assignments", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  sessionId: varchar("session_id").notNull().references(() => customSessions.id, { onDelete: "cascade" }),
+  patientId: varchar("patient_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  assignedBy: varchar("assigned_by").notNull().references(() => users.id),
+  // admin qui assigne
+  assignedAt: timestamp("assigned_at").defaultNow(),
+  dueDate: timestamp("due_date"),
+  // date limite pour compléter
+  priority: varchar("priority").default("normal"),
+  // 'low', 'normal', 'high', 'urgent'
+  instructions: text("instructions"),
+  // instructions spécifiques pour ce patient
+  isRecurring: boolean("is_recurring").default(false),
+  // séance récurrente
+  recurringPattern: jsonb("recurring_pattern"),
+  // configuration de récurrence (ex: 3x/semaine)
+  status: varchar("status").default("assigned"),
+  // 'assigned', 'started', 'completed', 'missed', 'canceled'
+  completedAt: timestamp("completed_at"),
+  feedback: text("feedback"),
+  // retour du patient après completion
+  adminNotes: text("admin_notes"),
+  // notes privées de l'admin
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow()
 });
 var exerciseLibrary = pgTable("exercise_library", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -514,6 +557,12 @@ var exerciseLibrary = pgTable("exercise_library", {
   // vérifié par un professionnel
   isFeatured: boolean("is_featured").default(false),
   // mis en avant
+  optionVariable1: text("option_variable_1"),
+  // champ personnalisable 1
+  optionVariable2: text("option_variable_2"),
+  // champ personnalisable 2
+  optionVariable3: text("option_variable_3"),
+  // champ personnalisable 3
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow()
 });
@@ -555,6 +604,11 @@ var insertExerciseLibrarySchema = createInsertSchema(exerciseLibrary).omit({
   updatedAt: true
 });
 var insertExerciseRatingSchema = createInsertSchema(exerciseRatings).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true
+});
+var insertSessionAssignmentSchema = createInsertSchema(sessionAssignments2).omit({
   id: true,
   createdAt: true,
   updatedAt: true
@@ -1065,6 +1119,66 @@ var Storage = class {
       console.error("Error deleting emergency routine:", error);
       return false;
     }
+  }
+  // === CUSTOM SESSIONS ===
+  async createCustomSession(sessionData) {
+    const result = await this.db.insert(customSessions).values(sessionData).returning();
+    return result[0];
+  }
+  async getCustomSession(id) {
+    const result = await this.db.select().from(customSessions).where(eq(customSessions.id, id)).limit(1);
+    return result[0] || null;
+  }
+  async getCustomSessionsByCreator(creatorId) {
+    return await this.db.select().from(customSessions).where(eq(customSessions.creatorId, creatorId)).orderBy(desc(customSessions.createdAt));
+  }
+  async getPublishedSessions() {
+    return await this.db.select().from(customSessions).where(eq(customSessions.status, "published")).orderBy(desc(customSessions.publishedAt));
+  }
+  async updateCustomSession(id, data) {
+    const result = await this.db.update(customSessions).set({ ...data, updatedAt: /* @__PURE__ */ new Date() }).where(eq(customSessions.id, id)).returning();
+    return result[0];
+  }
+  async publishSession(id, targetAudience = "all") {
+    return await this.updateCustomSession(id, {
+      status: "published",
+      publishedAt: /* @__PURE__ */ new Date(),
+      targetAudience
+    });
+  }
+  // === SESSION ASSIGNMENTS ===
+  async createSessionAssignment(assignmentData) {
+    const result = await this.db.insert(sessionAssignments).values(assignmentData).returning();
+    return result[0];
+  }
+  async getSessionAssignmentsByPatient(patientId) {
+    return await this.db.select().from(sessionAssignments).where(eq(sessionAssignments.patientId, patientId)).orderBy(desc(sessionAssignments.assignedAt));
+  }
+  async getSessionAssignmentsByTherapist(therapistId) {
+    return await this.db.select().from(sessionAssignments).where(eq(sessionAssignments.assignedBy, therapistId)).orderBy(desc(sessionAssignments.assignedAt));
+  }
+  async updateSessionAssignment(id, data) {
+    const result = await this.db.update(sessionAssignments).set({ ...data, updatedAt: /* @__PURE__ */ new Date() }).where(eq(sessionAssignments.id, id)).returning();
+    return result[0];
+  }
+  async completeSessionAssignment(id, feedback) {
+    return await this.updateSessionAssignment(id, {
+      status: "completed",
+      completedAt: /* @__PURE__ */ new Date(),
+      feedback
+    });
+  }
+  // === SESSION ELEMENTS ===
+  async createSessionElement(elementData) {
+    const result = await this.db.insert(sessionElements).values(elementData).returning();
+    return result[0];
+  }
+  async getSessionElements(sessionId) {
+    return await this.db.select().from(sessionElements).where(eq(sessionElements.sessionId, sessionId)).orderBy(sessionElements.order);
+  }
+  async updateSessionElement(id, data) {
+    const result = await this.db.update(sessionElements).set(data).where(eq(sessionElements.id, id)).returning();
+    return result[0];
   }
   // Les méthodes getAllUsersWithStats, getUserById et deleteUser sont déjà définies plus haut
   // === EXERCISE VARIATIONS ===
@@ -1594,20 +1708,10 @@ function registerRoutes(app2) {
       if (exerciseId) {
         const exercise = await storage.getExerciseById(exerciseId);
         if (!exercise) {
-          const exercises2 = await storage.getAllExercises();
-          if (exercises2.length > 0) {
-            validExerciseId = exercises2[0].id;
-          } else {
-            return res.status(400).json({ message: "Aucun exercice disponible dans la base de donn\xE9es" });
-          }
+          return res.status(404).json({ message: "Exercice non trouv\xE9" });
         }
       } else {
-        const exercises2 = await storage.getAllExercises();
-        if (exercises2.length > 0) {
-          validExerciseId = exercises2[0].id;
-        } else {
-          return res.status(400).json({ message: "Aucun exercice disponible dans la base de donn\xE9es" });
-        }
+        return res.status(400).json({ message: "exerciseId est requis pour cr\xE9er une session" });
       }
       const session2 = await storage.createExerciseSession({
         userId: req.session.user.id,
@@ -1722,472 +1826,7 @@ function registerRoutes(app2) {
       res.json(analyses);
     } catch (error) {
       console.error("Error fetching Beck analyses:", error);
-      res.status(500).json({ message: "Erreur lors de la r\xE9cup\xE9ration des analyses" });
-    }
-  });
-  app2.post("/api/strategies", requireAuth, async (req, res) => {
-    try {
-      const { strategies } = req.body;
-      console.log("\u{1F4DD} Strategies save request for user:", req.session.user.id);
-      console.log("\u{1F4DD} Received strategies data:", strategies);
-      if (!strategies || !Array.isArray(strategies) || strategies.length === 0) {
-        console.warn("\u274C No strategies provided or invalid format");
-        return res.status(400).json({ message: "Au moins une strat\xE9gie requise" });
-      }
-      const savedStrategies = [];
-      for (let i = 0; i < strategies.length; i++) {
-        const strategyData = strategies[i];
-        const { context, exercise, effort, duration, cravingBefore, cravingAfter } = strategyData;
-        console.log(`\u{1F50D} Validating strategy ${i + 1}:`, strategyData);
-        if (!context || typeof context !== "string") {
-          console.error(`\u274C Invalid context for strategy ${i + 1}:`, context);
-          return res.status(400).json({ message: `Contexte invalide pour la strat\xE9gie ${i + 1}` });
-        }
-        if (!exercise || typeof exercise !== "string" || exercise.trim().length === 0) {
-          console.error(`\u274C Invalid exercise for strategy ${i + 1}:`, exercise);
-          return res.status(400).json({ message: `Description d'exercice requise pour la strat\xE9gie ${i + 1}` });
-        }
-        if (!effort || typeof effort !== "string") {
-          console.error(`\u274C Invalid effort for strategy ${i + 1}:`, effort);
-          return res.status(400).json({ message: `Niveau d'effort invalide pour la strat\xE9gie ${i + 1}` });
-        }
-        const durationNum = Number(duration);
-        if (isNaN(durationNum) || durationNum < 1 || durationNum > 180) {
-          console.error(`\u274C Invalid duration for strategy ${i + 1}:`, duration);
-          return res.status(400).json({ message: `Dur\xE9e invalide pour la strat\xE9gie ${i + 1} (1-180 min requis)` });
-        }
-        const cravingBeforeNum = Number(cravingBefore);
-        if (isNaN(cravingBeforeNum) || cravingBeforeNum < 0 || cravingBeforeNum > 10) {
-          console.error(`\u274C Invalid cravingBefore for strategy ${i + 1}:`, cravingBefore);
-          return res.status(400).json({ message: `Craving avant invalide pour la strat\xE9gie ${i + 1} (0-10 requis)` });
-        }
-        const cravingAfterNum = Number(cravingAfter);
-        if (isNaN(cravingAfterNum) || cravingAfterNum < 0 || cravingAfterNum > 10) {
-          console.error(`\u274C Invalid cravingAfter for strategy ${i + 1}:`, cravingAfter);
-          return res.status(400).json({ message: `Craving apr\xE8s invalide pour la strat\xE9gie ${i + 1} (0-10 requis)` });
-        }
-        try {
-          const strategy = await storage.createStrategy({
-            userId: req.session.user.id,
-            context: context.trim(),
-            exercise: exercise.trim(),
-            effort: effort.trim(),
-            duration: durationNum,
-            cravingBefore: cravingBeforeNum,
-            cravingAfter: cravingAfterNum
-          });
-          console.log(`\u2705 Strategy ${i + 1} created successfully:`, strategy.id);
-          savedStrategies.push(strategy);
-        } catch (dbError) {
-          console.error(`\u274C Database error for strategy ${i + 1}:`, dbError);
-          return res.status(500).json({ message: `Erreur de base de donn\xE9es pour la strat\xE9gie ${i + 1}: ${dbError.message}` });
-        }
-      }
-      console.log(`\u2705 All ${savedStrategies.length} strategies saved successfully`);
-      res.json({ strategies: savedStrategies, message: `${savedStrategies.length} strat\xE9gies sauvegard\xE9es avec succ\xE8s` });
-    } catch (error) {
-      console.error("\u274C Unexpected error creating strategies:", error);
-      res.status(500).json({
-        message: "Erreur lors de la cr\xE9ation des strat\xE9gies",
-        error: error.message
-      });
-    }
-  });
-  app2.get("/api/strategies", requireAuth, async (req, res) => {
-    try {
-      const strategies = await storage.getStrategiesByUser(req.session.user.id);
-      res.json(strategies);
-    } catch (error) {
-      console.error("Error fetching strategies:", error);
-      res.status(500).json({ message: "Erreur lors de la r\xE9cup\xE9ration des strat\xE9gies" });
-    }
-  });
-  app2.put("/api/strategies/:id", requireAuth, async (req, res) => {
-    try {
-      const { id } = req.params;
-      const { title, description, category, effectiveness } = req.body;
-      const strategy = await storage.updateStrategy(id, req.session.user.id, {
-        title,
-        description,
-        category,
-        effectiveness
-      });
-      if (!strategy) {
-        return res.status(404).json({ message: "Strat\xE9gie non trouv\xE9e" });
-      }
-      res.json(strategy);
-    } catch (error) {
-      console.error("Error updating strategy:", error);
-      res.status(500).json({ message: "Erreur lors de la mise \xE0 jour de la strat\xE9gie" });
-    }
-  });
-  app2.delete("/api/strategies/:id", requireAuth, async (req, res) => {
-    try {
-      const { id } = req.params;
-      const success = await storage.deleteStrategy(id, req.session.user.id);
-      if (!success) {
-        return res.status(404).json({ message: "Strat\xE9gie non trouv\xE9e" });
-      }
-      res.json({ message: "Strat\xE9gie supprim\xE9e avec succ\xE8s" });
-    } catch (error) {
-      console.error("Error deleting strategy:", error);
-      res.status(500).json({ message: "Erreur lors de la suppression de la strat\xE9gie" });
-    }
-  });
-  app2.get("/api/dashboard/stats", requireAuth, async (req, res) => {
-    try {
-      const stats = await storage.getUserStats(req.session.user.id);
-      res.json(stats);
-    } catch (error) {
-      console.error("Error fetching dashboard stats:", error);
-      res.status(500).json({ message: "Erreur lors de la r\xE9cup\xE9ration des statistiques" });
-    }
-  });
-  app2.get("/api/relaxation-exercises", requireAuth, async (req, res) => {
-    try {
-      const exercises2 = await storage.getRelaxationExercises();
-      res.json(exercises2);
-    } catch (error) {
-      console.error("Error fetching relaxation exercises:", error);
-      res.status(500).json({ message: "Erreur lors de la r\xE9cup\xE9ration des exercices de relaxation" });
-    }
-  });
-  app2.get("/api/admin/users", requireAdmin, async (req, res) => {
-    try {
-      const users2 = await storage.getAllUsersWithStats();
-      res.json(users2);
-    } catch (error) {
-      console.error("Error fetching admin users:", error);
-      res.status(500).json({ message: "Erreur lors de la r\xE9cup\xE9ration des utilisateurs" });
-    }
-  });
-  app2.delete("/api/admin/users/:id", requireAdmin, async (req, res) => {
-    try {
-      const { id } = req.params;
-      const userToDelete = await storage.getUserById(id);
-      if (userToDelete?.role === "admin") {
-        return res.status(403).json({ message: "Impossible de supprimer un administrateur" });
-      }
-      const success = await storage.deleteUser(id);
-      if (!success) {
-        return res.status(404).json({ message: "Utilisateur non trouv\xE9" });
-      }
-      res.json({ message: "Utilisateur supprim\xE9 avec succ\xE8s" });
-    } catch (error) {
-      console.error("Error deleting user:", error);
-      res.status(500).json({ message: "Erreur lors de la suppression de l'utilisateur" });
-    }
-  });
-  app2.get("/api/emergency-routines", requireAuth, async (req, res) => {
-    try {
-      const routines = await storage.getEmergencyRoutines(req.session.user.id);
-      res.json(routines);
-    } catch (error) {
-      console.error("Error fetching emergency routines:", error);
-      res.status(500).json({ message: "Erreur lors de la r\xE9cup\xE9ration des routines d'urgence" });
-    }
-  });
-  app2.post("/api/emergency-routines", requireAuth, async (req, res) => {
-    try {
-      const routineData = {
-        ...req.body,
-        userId: req.session.user.id
-      };
-      const routine = await storage.createEmergencyRoutine(routineData);
-      res.json(routine);
-    } catch (error) {
-      console.error("Error creating emergency routine:", error);
-      res.status(500).json({ message: "Erreur lors de la cr\xE9ation de la routine d'urgence" });
-    }
-  });
-  app2.put("/api/emergency-routines/:id", requireAuth, async (req, res) => {
-    try {
-      const { id } = req.params;
-      const userId = req.session.user.id;
-      const existingRoutine = await storage.getEmergencyRoutineById(id);
-      if (!existingRoutine || existingRoutine.userId !== userId) {
-        return res.status(403).json({ message: "Routine non trouv\xE9e ou acc\xE8s refus\xE9" });
-      }
-      const routine = await storage.updateEmergencyRoutine(id, req.body);
-      res.json(routine);
-    } catch (error) {
-      console.error("Error updating emergency routine:", error);
-      res.status(500).json({ message: "Erreur lors de la mise \xE0 jour de la routine d'urgence" });
-    }
-  });
-  app2.delete("/api/emergency-routines/:id", requireAuth, async (req, res) => {
-    try {
-      const { id } = req.params;
-      const userId = req.session.user.id;
-      const existingRoutine = await storage.getEmergencyRoutineById(id);
-      if (!existingRoutine || existingRoutine.userId !== userId) {
-        return res.status(403).json({ message: "Routine non trouv\xE9e ou acc\xE8s refus\xE9" });
-      }
-      const success = await storage.deleteEmergencyRoutine(id);
-      if (success) {
-        res.json({ message: "Routine d'urgence supprim\xE9e avec succ\xE8s" });
-      } else {
-        res.status(500).json({ message: "Erreur lors de la suppression" });
-      }
-    } catch (error) {
-      console.error("Error deleting emergency routine:", error);
-      res.status(500).json({ message: "Erreur lors de la suppression de la routine d'urgence" });
-    }
-  });
-  app2.get("/api/exercises/:id/variations", requireAuth, async (req, res) => {
-    try {
-      const { id } = req.params;
-      const variations = await storage.getExerciseVariations(id);
-      res.json(variations);
-    } catch (error) {
-      console.error("Error fetching exercise variations:", error);
-      res.status(500).json({ message: "Erreur lors de la r\xE9cup\xE9ration des variations" });
-    }
-  });
-  app2.post("/api/exercises/:id/variations", requireAdmin, async (req, res) => {
-    try {
-      const { id } = req.params;
-      const { type, title, description, instructions, difficultyModifier, benefits } = req.body;
-      if (!type || !title || !description) {
-        return res.status(400).json({ message: "Type, titre et description requis" });
-      }
-      const variation = await storage.createExerciseVariation({
-        exerciseId: id,
-        type,
-        title,
-        description,
-        instructions,
-        difficultyModifier: difficultyModifier || 0,
-        benefits
-      });
-      res.json(variation);
-    } catch (error) {
-      console.error("Error creating exercise variation:", error);
-      res.status(500).json({ message: "Erreur lors de la cr\xE9ation de la variation" });
-    }
-  });
-  app2.get("/api/custom-sessions", requireAuth, async (req, res) => {
-    try {
-      const sessions = await storage.getCustomSessions(req.session.user.id);
-      res.json(sessions);
-    } catch (error) {
-      console.error("Error fetching custom sessions:", error);
-      res.status(500).json({ message: "Erreur lors de la r\xE9cup\xE9ration des s\xE9ances" });
-    }
-  });
-  app2.get("/api/custom-sessions/:id", requireAuth, async (req, res) => {
-    try {
-      const { id } = req.params;
-      const session2 = await storage.getCustomSessionById(id);
-      if (!session2) {
-        return res.status(404).json({ message: "S\xE9ance non trouv\xE9e" });
-      }
-      if (!session2.isPublic && session2.creatorId !== req.session.user.id && req.session.user.role !== "admin") {
-        return res.status(403).json({ message: "Acc\xE8s refus\xE9 \xE0 cette s\xE9ance" });
-      }
-      const elements = await storage.getSessionElements(id);
-      res.json({ ...session2, elements });
-    } catch (error) {
-      console.error("Error fetching custom session:", error);
-      res.status(500).json({ message: "Erreur lors de la r\xE9cup\xE9ration de la s\xE9ance" });
-    }
-  });
-  app2.post("/api/custom-sessions", requireAuth, async (req, res) => {
-    try {
-      const { title, description, category, difficulty, isTemplate, isPublic, tags, exercises: exercises2 } = req.body;
-      if (!title || !description || !exercises2 || !Array.isArray(exercises2)) {
-        return res.status(400).json({ message: "Titre, description et exercices requis" });
-      }
-      if (exercises2.length === 0) {
-        return res.status(400).json({ message: "Au moins un exercice est requis" });
-      }
-      const totalDuration = exercises2.reduce((total, ex) => {
-        return total + ex.duration * ex.repetitions + ex.restTime;
-      }, 0);
-      const sessionData = {
-        creatorId: req.session.user.id,
-        title,
-        description,
-        category: category || "maintenance",
-        difficulty: difficulty || "beginner",
-        totalDuration,
-        isTemplate: isTemplate !== false,
-        // Par défaut true
-        isPublic: isPublic === true,
-        // Par défaut false
-        tags: Array.isArray(tags) ? tags : []
-      };
-      const session2 = await storage.createCustomSession(sessionData);
-      for (let i = 0; i < exercises2.length; i++) {
-        const exercise = exercises2[i];
-        await storage.createSessionElement({
-          sessionId: session2.id,
-          exerciseId: exercise.exerciseId,
-          variationId: exercise.variationId || null,
-          order: i,
-          duration: exercise.duration,
-          repetitions: exercise.repetitions || 1,
-          restTime: exercise.restTime || 0,
-          notes: exercise.notes || null,
-          isOptional: exercise.isOptional || false
-        });
-      }
-      res.json(session2);
-    } catch (error) {
-      console.error("Error creating custom session:", error);
-      res.status(500).json({ message: "Erreur lors de la cr\xE9ation de la s\xE9ance" });
-    }
-  });
-  app2.put("/api/custom-sessions/:id", requireAuth, async (req, res) => {
-    try {
-      const { id } = req.params;
-      const userId = req.session.user.id;
-      const existingSession = await storage.getCustomSessionById(id);
-      if (!existingSession) {
-        return res.status(404).json({ message: "S\xE9ance non trouv\xE9e" });
-      }
-      if (existingSession.creatorId !== userId && req.session.user.role !== "admin") {
-        return res.status(403).json({ message: "Acc\xE8s refus\xE9" });
-      }
-      const { title, description, category, difficulty, isPublic, tags, exercises: exercises2 } = req.body;
-      const updatedSession = await storage.updateCustomSession(id, {
-        title,
-        description,
-        category,
-        difficulty,
-        isPublic,
-        tags,
-        totalDuration: exercises2 ? exercises2.reduce((total, ex) => {
-          return total + ex.duration * ex.repetitions + ex.restTime;
-        }, 0) : existingSession.totalDuration
-      });
-      if (exercises2 && Array.isArray(exercises2)) {
-        await storage.deleteSessionElements(id);
-        for (let i = 0; i < exercises2.length; i++) {
-          const exercise = exercises2[i];
-          await storage.createSessionElement({
-            sessionId: id,
-            exerciseId: exercise.exerciseId,
-            variationId: exercise.variationId || null,
-            order: i,
-            duration: exercise.duration,
-            repetitions: exercise.repetitions || 1,
-            restTime: exercise.restTime || 0,
-            notes: exercise.notes || null,
-            isOptional: exercise.isOptional || false
-          });
-        }
-      }
-      res.json(updatedSession);
-    } catch (error) {
-      console.error("Error updating custom session:", error);
-      res.status(500).json({ message: "Erreur lors de la mise \xE0 jour de la s\xE9ance" });
-    }
-  });
-  app2.post("/api/custom-sessions/:id/copy", requireAuth, async (req, res) => {
-    try {
-      const { id } = req.params;
-      const userId = req.session.user.id;
-      const originalSession = await storage.getCustomSessionById(id);
-      if (!originalSession) {
-        return res.status(404).json({ message: "S\xE9ance non trouv\xE9e" });
-      }
-      if (!originalSession.isPublic && originalSession.creatorId !== userId && req.session.user.role !== "admin") {
-        return res.status(403).json({ message: "Acc\xE8s refus\xE9 \xE0 cette s\xE9ance" });
-      }
-      const elements = await storage.getSessionElements(id);
-      const copyData = {
-        creatorId: userId,
-        title: `Ma copie - ${originalSession.title}`,
-        description: originalSession.description,
-        category: originalSession.category,
-        difficulty: originalSession.difficulty,
-        totalDuration: originalSession.totalDuration,
-        isTemplate: true,
-        isPublic: false,
-        // Les copies sont privées par défaut
-        tags: originalSession.tags
-      };
-      const copiedSession = await storage.createCustomSession(copyData);
-      for (const element of elements) {
-        await storage.createSessionElement({
-          sessionId: copiedSession.id,
-          exerciseId: element.exerciseId,
-          variationId: element.variationId,
-          order: element.order,
-          duration: element.duration,
-          repetitions: element.repetitions,
-          restTime: element.restTime,
-          notes: element.notes,
-          isOptional: element.isOptional
-        });
-      }
-      res.json({
-        ...copiedSession,
-        elements,
-        message: "S\xE9ance copi\xE9e avec succ\xE8s. Vous pouvez maintenant la personnaliser."
-      });
-    } catch (error) {
-      console.error("Error copying custom session:", error);
-      res.status(500).json({ message: "Erreur lors de la copie de la s\xE9ance" });
-    }
-  });
-  app2.delete("/api/custom-sessions/:id", requireAuth, async (req, res) => {
-    try {
-      const { id } = req.params;
-      const userId = req.session.user.id;
-      const existingSession = await storage.getCustomSessionById(id);
-      if (!existingSession) {
-        return res.status(404).json({ message: "S\xE9ance non trouv\xE9e" });
-      }
-      if (existingSession.creatorId !== userId && req.session.user.role !== "admin") {
-        return res.status(403).json({ message: "Acc\xE8s refus\xE9" });
-      }
-      const success = await storage.deleteCustomSession(id);
-      if (success) {
-        res.json({ message: "S\xE9ance supprim\xE9e avec succ\xE8s" });
-      } else {
-        res.status(500).json({ message: "Erreur lors de la suppression" });
-      }
-    } catch (error) {
-      console.error("Error deleting custom session:", error);
-      res.status(500).json({ message: "Erreur lors de la suppression de la s\xE9ance" });
-    }
-  });
-  app2.post("/api/session-instances", requireAuth, async (req, res) => {
-    try {
-      const { sessionId, cravingBefore, moodBefore } = req.body;
-      if (!sessionId) {
-        return res.status(400).json({ message: "ID de s\xE9ance requis" });
-      }
-      const sessionInstance = await storage.createSessionInstance({
-        userId: req.session.user.id,
-        sessionId,
-        status: "started",
-        currentElementIndex: 0,
-        cravingBefore,
-        moodBefore,
-        completedElements: []
-      });
-      res.json(sessionInstance);
-    } catch (error) {
-      console.error("Error creating session instance:", error);
-      res.status(500).json({ message: "Erreur lors du d\xE9marrage de la s\xE9ance" });
-    }
-  });
-  app2.put("/api/session-instances/:id", requireAuth, async (req, res) => {
-    try {
-      const { id } = req.params;
-      const userId = req.session.user.id;
-      const existingInstance = await storage.getSessionInstanceById(id);
-      if (!existingInstance || existingInstance.userId !== userId) {
-        return res.status(403).json({ message: "Instance non trouv\xE9e ou acc\xE8s refus\xE9" });
-      }
-      const updatedInstance = await storage.updateSessionInstance(id, req.body);
-      res.json(updatedInstance);
-    } catch (error) {
-      console.error("Error updating session instance:", error);
-      res.status(500).json({ message: "Erreur lors de la mise \xE0 jour de l'instance" });
+      res.status(500).json({ message: "Erreur lors de la r\xE9cup\xE9ration de l'historique" });
     }
   });
   app2.get("/api/session-instances/user", requireAuth, async (req, res) => {
@@ -2198,6 +1837,59 @@ function registerRoutes(app2) {
     } catch (error) {
       console.error("Error fetching session instances:", error);
       res.status(500).json({ message: "Erreur lors de la r\xE9cup\xE9ration de l'historique" });
+    }
+  });
+  app2.post("/api/custom-sessions", requireAuth, async (req, res) => {
+    try {
+      if (req.session.user.role !== "admin" && req.session.user.role !== "therapist") {
+        return res.status(403).json({ message: "Acc\xE8s refus\xE9 - r\xF4le requis: admin ou th\xE9rapeute" });
+      }
+      const session2 = await storage.createCustomSession(req.body);
+      res.json(session2);
+    } catch (error) {
+      console.error("Error creating custom session:", error);
+      res.status(500).json({ message: "Erreur lors de la cr\xE9ation de la session" });
+    }
+  });
+  app2.get("/api/custom-sessions", requireAuth, async (req, res) => {
+    try {
+      const sessions = await storage.getCustomSessions();
+      res.json(sessions);
+    } catch (error) {
+      console.error("Error fetching custom sessions:", error);
+      res.status(500).json({ message: "Erreur lors de la r\xE9cup\xE9ration des sessions" });
+    }
+  });
+  app2.put("/api/custom-sessions/:id", requireAuth, async (req, res) => {
+    try {
+      if (req.session.user.role !== "admin" && req.session.user.role !== "therapist") {
+        return res.status(403).json({ message: "Acc\xE8s refus\xE9" });
+      }
+      const { id } = req.params;
+      const session2 = await storage.updateCustomSession(id, req.body);
+      res.json(session2);
+    } catch (error) {
+      console.error("Error updating custom session:", error);
+      res.status(500).json({ message: "Erreur lors de la mise \xE0 jour de la session" });
+    }
+  });
+  app2.post("/api/session-elements", requireAuth, async (req, res) => {
+    try {
+      const element = await storage.createSessionElement(req.body);
+      res.json(element);
+    } catch (error) {
+      console.error("Error creating session element:", error);
+      res.status(500).json({ message: "Erreur lors de la cr\xE9ation de l'\xE9l\xE9ment de session" });
+    }
+  });
+  app2.put("/api/session-elements/:id", requireAuth, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const element = await storage.updateSessionElement(id, req.body);
+      res.json(element);
+    } catch (error) {
+      console.error("Error updating session element:", error);
+      res.status(500).json({ message: "Erreur lors de la mise \xE0 jour de l'\xE9l\xE9ment de session" });
     }
   });
   console.log("\u2705 All routes registered successfully");
@@ -2542,9 +2234,13 @@ app.get("/api/data", async (_req, res) => {
     res.status(500).json({ message: "Erreur serveur", error: err.message });
   }
 });
-app.use((err, _req, res, _next) => {
-  console.error("\u274C Erreur serveur:", err);
-  res.status(500).json({ message: "Erreur interne" });
+app.use((err, req, res, next) => {
+  console.error("\u274C Erreur serveur:", err.stack || err);
+  if (process.env.NODE_ENV === "production") {
+    res.status(500).json({ message: "Une erreur interne est survenue." });
+  } else {
+    res.status(500).json({ message: err.message, stack: err.stack });
+  }
 });
 app.get("*", (_req, res) => {
   res.sendFile(path.join(distPath, "index.html"));
