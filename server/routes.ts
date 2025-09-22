@@ -308,10 +308,10 @@ export function registerRoutes(app: Application) {
       if (exerciseId) {
         const exercise = await storage.getExerciseById(exerciseId);
         if (!exercise) {
-          return res.status(404).json({ message: \'Exercice non trouvé\' });
+          return res.status(404).json({ message: 'Exercice non trouvé' });
         }
       } else {
-        return res.status(400).json({ message: \'exerciseId est requis pour créer une session\' });
+        return res.status(400).json({ message: 'exerciseId est requis pour créer une session' });
       } 
       const session = await storage.createExerciseSession({
         userId: req.session.user!.id,
