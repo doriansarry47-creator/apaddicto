@@ -1224,7 +1224,7 @@ var Storage = class {
   // === USER EMERGENCY ROUTINES ===
   async getEmergencyRoutines(userId) {
     try {
-      const result = await this.db.select().from(userEmergencyRoutines).where(eq(userEmergencyRoutines.userId, userId)).orderBy(desc(userEmergencyRoutines.updatedAt));
+      const result = await this.db.select().from(emergencyRoutines).where(eq(emergencyRoutines.isActive, true)).orderBy(desc(emergencyRoutines.updatedAt));
       return result;
     } catch (error) {
       console.error("Error fetching emergency routines:", error);
@@ -1233,7 +1233,7 @@ var Storage = class {
   }
   async getEmergencyRoutineById(routineId) {
     try {
-      const result = await this.db.select().from(userEmergencyRoutines).where(eq(userEmergencyRoutines.id, routineId)).limit(1);
+      const result = await this.db.select().from(emergencyRoutines).where(eq(emergencyRoutines.id, routineId)).limit(1);
       return result[0] || null;
     } catch (error) {
       console.error("Error fetching emergency routine by ID:", error);
@@ -1242,10 +1242,9 @@ var Storage = class {
   }
   async createEmergencyRoutine(routineData) {
     try {
-      const result = await this.db.insert(userEmergencyRoutines).values({
+      const result = await this.db.insert(emergencyRoutines).values({
         ...routineData,
-        updatedAt: /* @__PURE__ */ new Date(),
-        exercises: routineData.exercises ? JSON.parse(JSON.stringify(routineData.exercises)) : []
+        updatedAt: /* @__PURE__ */ new Date()
       }).returning();
       return result[0];
     } catch (error) {
@@ -1255,10 +1254,10 @@ var Storage = class {
   }
   async updateEmergencyRoutine(routineId, updateData) {
     try {
-      const result = await this.db.update(userEmergencyRoutines).set({
+      const result = await this.db.update(emergencyRoutines).set({
         ...updateData,
         updatedAt: /* @__PURE__ */ new Date()
-      }).where(eq(userEmergencyRoutines.id, routineId)).returning();
+      }).where(eq(emergencyRoutines.id, routineId)).returning();
       return result[0];
     } catch (error) {
       console.error("Error updating emergency routine:", error);
@@ -1267,7 +1266,7 @@ var Storage = class {
   }
   async deleteEmergencyRoutine(routineId) {
     try {
-      const result = await this.db.delete(userEmergencyRoutines).where(eq(userEmergencyRoutines.id, routineId)).returning();
+      const result = await this.db.delete(emergencyRoutines).where(eq(emergencyRoutines.id, routineId)).returning();
       return result.length > 0;
     } catch (error) {
       console.error("Error deleting emergency routine:", error);
@@ -1437,7 +1436,22 @@ var Storage = class {
         completedAt: patientSessions.completedAt,
         session: customSessions
       }).from(patientSessions).leftJoin(customSessions, eq(patientSessions.sessionId, customSessions.id)).where(eq(patientSessions.patientId, patientId)).orderBy(desc(patientSessions.assignedAt));
-      return sessions;
+      const sessionsWithElements = await Promise.all(
+        sessions.map(async (session2) => {
+          if (session2.sessionId) {
+            const elements = await this.db.select().from(sessionElements).where(eq(sessionElements.sessionId, session2.sessionId)).orderBy(sessionElements.order);
+            return {
+              ...session2,
+              session: session2.session ? {
+                ...session2.session,
+                elements
+              } : null
+            };
+          }
+          return session2;
+        })
+      );
+      return sessionsWithElements;
     } catch (error) {
       console.error("Error fetching patient sessions:", error);
       throw error;
@@ -1617,10 +1631,23 @@ var Storage = class {
   }
   async updateEducationalContent(id, data) {
     try {
-      const result = await this.db.update(educationalContents).set({ ...data, updatedAt: /* @__PURE__ */ new Date() }).where(eq(educationalContents.id, id)).returning();
+      const existingContent = await this.db.select().from(educationalContents).where(eq(educationalContents.id, id)).limit(1);
+      if (!existingContent || existingContent.length === 0) {
+        console.error("Educational content not found for update:", id);
+        return null;
+      }
+      const updateData = {
+        ...data,
+        updatedAt: /* @__PURE__ */ new Date()
+      };
+      if (updateData.tags && Array.isArray(updateData.tags)) {
+        updateData.tags = updateData.tags.filter((tag) => tag && tag.trim().length > 0);
+      }
+      const result = await this.db.update(educationalContents).set(updateData).where(eq(educationalContents.id, id)).returning();
+      console.log("\u2705 Educational content updated successfully:", id);
       return result[0] || null;
     } catch (error) {
-      console.error("Error updating educational content:", error);
+      console.error("\u274C Error updating educational content:", error);
       throw error;
     }
   }
@@ -2511,11 +2538,10 @@ function registerRoutes(app2) {
   });
   app2.post("/api/emergency-routines", requireAuth, async (req, res) => {
     try {
-      const routineData = {
-        ...req.body,
-        userId: req.session.user.id
-      };
-      const routine = await storage.createEmergencyRoutine(routineData);
+      if (req.session.user.role !== "admin") {
+        return res.status(403).json({ message: "Seuls les admins peuvent cr\xE9er des routines d'urgence" });
+      }
+      const routine = await storage.createEmergencyRoutine(req.body);
       res.json(routine);
     } catch (error) {
       console.error("Error creating emergency routine:", error);
@@ -2525,10 +2551,12 @@ function registerRoutes(app2) {
   app2.put("/api/emergency-routines/:id", requireAuth, async (req, res) => {
     try {
       const { id } = req.params;
-      const userId = req.session.user.id;
+      if (req.session.user.role !== "admin") {
+        return res.status(403).json({ message: "Seuls les admins peuvent modifier les routines d'urgence" });
+      }
       const existingRoutine = await storage.getEmergencyRoutineById(id);
-      if (!existingRoutine || existingRoutine.userId !== userId) {
-        return res.status(403).json({ message: "Routine non trouv\xE9e ou acc\xE8s refus\xE9" });
+      if (!existingRoutine) {
+        return res.status(404).json({ message: "Routine non trouv\xE9e" });
       }
       const routine = await storage.updateEmergencyRoutine(id, req.body);
       res.json(routine);
@@ -2540,10 +2568,12 @@ function registerRoutes(app2) {
   app2.delete("/api/emergency-routines/:id", requireAuth, async (req, res) => {
     try {
       const { id } = req.params;
-      const userId = req.session.user.id;
+      if (req.session.user.role !== "admin") {
+        return res.status(403).json({ message: "Seuls les admins peuvent supprimer les routines d'urgence" });
+      }
       const existingRoutine = await storage.getEmergencyRoutineById(id);
-      if (!existingRoutine || existingRoutine.userId !== userId) {
-        return res.status(403).json({ message: "Routine non trouv\xE9e ou acc\xE8s refus\xE9" });
+      if (!existingRoutine) {
+        return res.status(404).json({ message: "Routine non trouv\xE9e" });
       }
       const success = await storage.deleteEmergencyRoutine(id);
       if (success) {
