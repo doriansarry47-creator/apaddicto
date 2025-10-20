@@ -1329,15 +1329,39 @@ class Storage {
 
   async updateEducationalContent(id: string, data: Partial<InsertEducationalContent>): Promise<EducationalContent | null> {
     try {
+      // Récupérer le contenu existant
+      const existingContent = await this.db
+        .select()
+        .from(educationalContents)
+        .where(eq(educationalContents.id, id))
+        .limit(1);
+      
+      if (!existingContent || existingContent.length === 0) {
+        console.error('Educational content not found for update:', id);
+        return null;
+      }
+
+      // Fusionner les données sans écraser les champs non fournis
+      const updateData = {
+        ...data,
+        updatedAt: new Date()
+      };
+
+      // S'assurer que les tags sont correctement formattés
+      if (updateData.tags && Array.isArray(updateData.tags)) {
+        updateData.tags = updateData.tags.filter((tag: string) => tag && tag.trim().length > 0);
+      }
+
       const result = await this.db
         .update(educationalContents)
-        .set({ ...data, updatedAt: new Date() })
+        .set(updateData)
         .where(eq(educationalContents.id, id))
         .returning();
       
+      console.log('✅ Educational content updated successfully:', id);
       return result[0] || null;
     } catch (error) {
-      console.error('Error updating educational content:', error);
+      console.error('❌ Error updating educational content:', error);
       throw error;
     }
   }

@@ -44,6 +44,7 @@ export default function SquareBreathingExercise({
   const [phaseProgress, setPhaseProgress] = useState(0);
   const [totalDuration, setTotalDuration] = useState(0);
   const [showSettings, setShowSettings] = useState(false);
+  const [showCompletionMessage, setShowCompletionMessage] = useState(false);
   
   // Animation state
   const [ballPosition, setBallPosition] = useState({ x: 0, y: 0 });
@@ -215,6 +216,7 @@ export default function SquareBreathingExercise({
     if (animationRef.current) {
       cancelAnimationFrame(animationRef.current);
     }
+    setShowCompletionMessage(true);
     onComplete?.(duration);
   };
   
@@ -314,6 +316,29 @@ export default function SquareBreathingExercise({
       </CardHeader>
       
       <CardContent className="space-y-6">
+        {/* Message de complétion */}
+        {showCompletionMessage && (
+          <div className="bg-gradient-to-r from-indigo-50 to-purple-50 border-2 border-indigo-300 rounded-xl p-6 text-center animate-in fade-in slide-in-from-top-4 duration-500">
+            <div className="flex items-center justify-center gap-3 mb-3">
+              <div className="p-3 bg-indigo-100 rounded-full">
+                <Square className="h-8 w-8 text-indigo-600" />
+              </div>
+            </div>
+            <h3 className="text-2xl font-bold text-indigo-800 mb-2">🎉 Excellent travail !</h3>
+            <p className="text-indigo-700 text-lg mb-1">
+              Votre système nerveux est désormais calmé et équilibré 💙
+            </p>
+            <p className="text-indigo-600 text-sm">
+              Séance terminée : {settings.cycles} cycles en {formatTime(totalDuration)}
+            </p>
+            <Button 
+              onClick={() => { setShowCompletionMessage(false); resetState(); }} 
+              className="mt-4 bg-indigo-600 hover:bg-indigo-700"
+            >
+              Nouvelle séance
+            </Button>
+          </div>
+        )}
         {/* Settings Panel */}
         {showSettings && (
           <Card className="bg-muted/50">

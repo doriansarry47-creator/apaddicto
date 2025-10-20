@@ -38,11 +38,12 @@ export function Navigation() {
             
             {/* Desktop navigation - hidden on mobile */}
             <nav className="hidden md:flex items-center space-x-6">
-              <Link to="/" className={cn("px-3 py-2 rounded-lg text-sm font-medium transition-colors", 
+              <Link to="/" className={cn("px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-1", 
                 isActive("/") 
                   ? "bg-primary text-primary-foreground" 
                   : "text-muted-foreground hover:text-foreground hover:bg-muted"
               )} data-testid="nav-dashboard">
+                <span className="material-icons text-sm">home</span>
                 Accueil
               </Link>
               <Link to="/exercises" className={cn("px-3 py-2 rounded-lg text-sm font-medium transition-colors",

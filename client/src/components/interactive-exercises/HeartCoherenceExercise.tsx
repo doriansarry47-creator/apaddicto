@@ -40,6 +40,7 @@ export default function HeartCoherenceExercise({
   const [phaseProgress, setPhaseProgress] = useState(0);
   const [totalDuration, setTotalDuration] = useState(0);
   const [showSettings, setShowSettings] = useState(false);
+  const [showCompletionMessage, setShowCompletionMessage] = useState(false);
   
   // Animation state
   const [ballScale, setBallScale] = useState(0.5);
@@ -156,6 +157,7 @@ export default function HeartCoherenceExercise({
     if (animationRef.current) {
       cancelAnimationFrame(animationRef.current);
     }
+    setShowCompletionMessage(true);
     onComplete?.(duration);
   };
   
@@ -224,6 +226,29 @@ export default function HeartCoherenceExercise({
       </CardHeader>
       
       <CardContent className="space-y-6">
+        {/* Message de complétion */}
+        {showCompletionMessage && (
+          <div className="bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-300 rounded-xl p-6 text-center animate-in fade-in slide-in-from-top-4 duration-500">
+            <div className="flex items-center justify-center gap-3 mb-3">
+              <div className="p-3 bg-green-100 rounded-full">
+                <Heart className="h-8 w-8 text-green-600" />
+              </div>
+            </div>
+            <h3 className="text-2xl font-bold text-green-800 mb-2">🎉 Bravo !</h3>
+            <p className="text-green-700 text-lg mb-1">
+              Votre fréquence cardiaque est revenue à un rythme apaisé 💙
+            </p>
+            <p className="text-green-600 text-sm">
+              Vous avez complété {settings.cycles} cycles en {formatTime(totalDuration)}
+            </p>
+            <Button 
+              onClick={() => { setShowCompletionMessage(false); resetState(); }} 
+              className="mt-4 bg-green-600 hover:bg-green-700"
+            >
+              Nouvelle séance
+            </Button>
+          </div>
+        )}
         {/* Settings Panel */}
         {showSettings && (
           <Card className="bg-muted/50">
