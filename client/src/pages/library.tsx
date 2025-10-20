@@ -171,13 +171,13 @@ export default function Library() {
 
   // Regrouper les exercices par catégorie
   const exercisesByCategory = EXERCISE_CATEGORIES.reduce((acc, category) => {
-    acc[category.value] = filteredExercises.filter(item => item.category === category.value);
+    acc[category.value] = (filteredExercises || []).filter(item => item.category === category.value);
     return acc;
   }, {} as Record<string, Exercise[]>);
 
   // Regrouper les séances par catégorie
   const sessionsByCategory = SESSION_CATEGORIES.reduce((acc, category) => {
-    acc[category.value] = filteredSessions.filter(item => item.category === category.value);
+    acc[category.value] = (filteredSessions || []).filter(item => item.category === category.value);
     return acc;
   }, {} as Record<string, CustomSession[]>);
 
@@ -469,9 +469,9 @@ export default function Library() {
         {/* Vue contenu éducatif */}
         <TabsContent value="educational">
           <div className="space-y-8">
-            {contentCategories.length > 0 ? contentCategories.map(category => {
-              const categoryContent = educationalContentByCategory[category.id];
-              if (!categoryContent?.length) return null;
+            {(contentCategories || []).length > 0 ? (contentCategories || []).map(category => {
+              const categoryContent = educationalContentByCategory[category.id] || [];
+              if (!categoryContent || categoryContent.length === 0) return null;
               
               return (
                 <div key={category.id}>
@@ -511,8 +511,8 @@ export default function Library() {
         <TabsContent value="exercises">
           <div className="space-y-8">
             {EXERCISE_CATEGORIES.map(category => {
-              const categoryExercises = exercisesByCategory[category.value];
-              if (!categoryExercises?.length) return null;
+              const categoryExercises = exercisesByCategory[category.value] || [];
+              if (!categoryExercises || categoryExercises.length === 0) return null;
               
               return (
                 <div key={category.value}>
@@ -554,8 +554,8 @@ export default function Library() {
         <TabsContent value="sessions">
           <div className="space-y-8">
             {SESSION_CATEGORIES.map(category => {
-              const categorySessions = sessionsByCategory[category.value];
-              if (!categorySessions?.length) return null;
+              const categorySessions = sessionsByCategory[category.value] || [];
+              if (!categorySessions || categorySessions.length === 0) return null;
               
               return (
                 <div key={category.value}>

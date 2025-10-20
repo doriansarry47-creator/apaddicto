@@ -1522,6 +1522,70 @@ var Storage = class {
       throw error;
     }
   }
+  // === GESTION DES SÉANCES FAVORITES ===
+  async getFavoriteSessions(userId) {
+    try {
+      const favorites = await this.db.select({
+        id: favoriteSessions.id,
+        userId: favoriteSessions.userId,
+        sessionId: favoriteSessions.sessionId,
+        customName: favoriteSessions.customName,
+        customizedData: favoriteSessions.customizedData,
+        createdAt: favoriteSessions.createdAt,
+        session: customSessions
+      }).from(favoriteSessions).leftJoin(customSessions, eq(favoriteSessions.sessionId, customSessions.id)).where(eq(favoriteSessions.userId, userId)).orderBy(desc(favoriteSessions.createdAt));
+      return favorites.map((fav) => {
+        if (fav.customizedData) {
+          return {
+            ...fav.customizedData,
+            id: fav.id,
+            title: fav.customName || fav.customizedData.title || fav.session?.title,
+            isFavorite: true,
+            customizedFrom: fav.sessionId
+          };
+        }
+        return {
+          ...fav.session,
+          id: fav.id,
+          title: fav.customName || fav.session?.title,
+          isFavorite: true,
+          customizedFrom: fav.sessionId
+        };
+      });
+    } catch (error) {
+      console.error("Error fetching favorite sessions:", error);
+      throw error;
+    }
+  }
+  async addFavoriteSession(data) {
+    try {
+      const result = await this.db.insert(favoriteSessions).values({
+        id: crypto.randomUUID(),
+        userId: data.userId,
+        sessionId: data.sessionId,
+        customName: data.customName,
+        customizedData: data.customizedData,
+        createdAt: /* @__PURE__ */ new Date()
+      }).returning();
+      return result[0];
+    } catch (error) {
+      console.error("Error adding favorite session:", error);
+      throw error;
+    }
+  }
+  async deleteFavoriteSession(favoriteId, userId) {
+    try {
+      const existing = await this.db.select().from(favoriteSessions).where(eq(favoriteSessions.id, favoriteId)).limit(1);
+      if (!existing[0] || existing[0].userId !== userId) {
+        return false;
+      }
+      const result = await this.db.delete(favoriteSessions).where(eq(favoriteSessions.id, favoriteId)).returning();
+      return result.length > 0;
+    } catch (error) {
+      console.error("Error deleting favorite session:", error);
+      return false;
+    }
+  }
   // === DASHBOARD ADMINISTRATEUR ===
   async getAdminDashboardData() {
     try {
@@ -2680,6 +2744,49 @@ function registerRoutes(app2) {
     } catch (error) {
       console.error("Error completing patient session:", error);
       res.status(500).json({ message: "Erreur lors de la finalisation de la s\xE9ance" });
+    }
+  });
+  app2.get("/api/patient-sessions/favorites", requireAuth, async (req, res) => {
+    try {
+      const userId = req.session.user.id;
+      const favoriteSessions2 = await storage.getFavoriteSessions(userId);
+      res.json(favoriteSessions2);
+    } catch (error) {
+      console.error("Error fetching favorite sessions:", error);
+      res.status(500).json({ message: "Erreur lors de la r\xE9cup\xE9ration des s\xE9ances favorites" });
+    }
+  });
+  app2.post("/api/patient-sessions/favorites", requireAuth, async (req, res) => {
+    try {
+      const userId = req.session.user.id;
+      const { sessionId, customName, customizedData } = req.body;
+      if (!sessionId) {
+        return res.status(400).json({ message: "Session ID requis" });
+      }
+      const favoriteSession = await storage.addFavoriteSession({
+        userId,
+        sessionId,
+        customName,
+        customizedData
+      });
+      res.json(favoriteSession);
+    } catch (error) {
+      console.error("Error adding favorite session:", error);
+      res.status(500).json({ message: "Erreur lors de l'ajout de la s\xE9ance favorite" });
+    }
+  });
+  app2.delete("/api/patient-sessions/favorites/:id", requireAuth, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const userId = req.session.user.id;
+      const success = await storage.deleteFavoriteSession(id, userId);
+      if (!success) {
+        return res.status(404).json({ message: "S\xE9ance favorite non trouv\xE9e ou acc\xE8s refus\xE9" });
+      }
+      res.json({ message: "S\xE9ance favorite supprim\xE9e avec succ\xE8s" });
+    } catch (error) {
+      console.error("Error deleting favorite session:", error);
+      res.status(500).json({ message: "Erreur lors de la suppression de la s\xE9ance favorite" });
     }
   });
   app2.put("/api/exercises/:id", requireAdmin, async (req, res) => {

@@ -45,6 +45,7 @@ import {
   customSessions,
   sessionElements,
   patientSessions,
+  favoriteSessions,
   educationalContents,
   contentCategories,
   contentTags,
@@ -1155,6 +1156,101 @@ class Storage {
     } catch (error) {
       console.error('Error updating exercise:', error);
       throw error;
+    }
+  }
+
+  // === GESTION DES SÉANCES FAVORITES ===
+
+  async getFavoriteSessions(userId: string): Promise<any[]> {
+    try {
+      const favorites = await this.db
+        .select({
+          id: favoriteSessions.id,
+          userId: favoriteSessions.userId,
+          sessionId: favoriteSessions.sessionId,
+          customName: favoriteSessions.customName,
+          customizedData: favoriteSessions.customizedData,
+          createdAt: favoriteSessions.createdAt,
+          session: customSessions
+        })
+        .from(favoriteSessions)
+        .leftJoin(customSessions, eq(favoriteSessions.sessionId, customSessions.id))
+        .where(eq(favoriteSessions.userId, userId))
+        .orderBy(desc(favoriteSessions.createdAt));
+
+      // Retourner les données avec customizedData si disponible, sinon session originale
+      return favorites.map(fav => {
+        if (fav.customizedData) {
+          return {
+            ...fav.customizedData,
+            id: fav.id,
+            title: fav.customName || fav.customizedData.title || fav.session?.title,
+            isFavorite: true,
+            customizedFrom: fav.sessionId
+          };
+        }
+        return {
+          ...fav.session,
+          id: fav.id,
+          title: fav.customName || fav.session?.title,
+          isFavorite: true,
+          customizedFrom: fav.sessionId
+        };
+      });
+    } catch (error) {
+      console.error('Error fetching favorite sessions:', error);
+      throw error;
+    }
+  }
+
+  async addFavoriteSession(data: {
+    userId: string;
+    sessionId: string;
+    customName?: string;
+    customizedData?: any;
+  }): Promise<any> {
+    try {
+      const result = await this.db
+        .insert(favoriteSessions)
+        .values({
+          id: crypto.randomUUID(),
+          userId: data.userId,
+          sessionId: data.sessionId,
+          customName: data.customName,
+          customizedData: data.customizedData,
+          createdAt: new Date()
+        })
+        .returning();
+
+      return result[0];
+    } catch (error) {
+      console.error('Error adding favorite session:', error);
+      throw error;
+    }
+  }
+
+  async deleteFavoriteSession(favoriteId: string, userId: string): Promise<boolean> {
+    try {
+      // Vérifier que la séance favorite appartient à l'utilisateur
+      const existing = await this.db
+        .select()
+        .from(favoriteSessions)
+        .where(eq(favoriteSessions.id, favoriteId))
+        .limit(1);
+
+      if (!existing[0] || existing[0].userId !== userId) {
+        return false;
+      }
+
+      const result = await this.db
+        .delete(favoriteSessions)
+        .where(eq(favoriteSessions.id, favoriteId))
+        .returning();
+
+      return result.length > 0;
+    } catch (error) {
+      console.error('Error deleting favorite session:', error);
+      return false;
     }
   }
 

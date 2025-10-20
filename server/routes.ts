@@ -1005,6 +1005,63 @@ export function registerRoutes(app: Application) {
     }
   });
 
+  // === GESTION DES SÉANCES FAVORITES ===
+  
+  // GET /api/patient-sessions/favorites - Récupérer les séances favorites d'un patient
+  app.get('/api/patient-sessions/favorites', requireAuth, async (req, res) => {
+    try {
+      const userId = req.session.user!.id;
+      const favoriteSessions = await storage.getFavoriteSessions(userId);
+      res.json(favoriteSessions);
+    } catch (error: any) {
+      console.error('Error fetching favorite sessions:', error);
+      res.status(500).json({ message: 'Erreur lors de la récupération des séances favorites' });
+    }
+  });
+
+  // POST /api/patient-sessions/favorites - Ajouter une séance favorite
+  app.post('/api/patient-sessions/favorites', requireAuth, async (req, res) => {
+    try {
+      const userId = req.session.user!.id;
+      const { sessionId, customName, customizedData } = req.body;
+
+      if (!sessionId) {
+        return res.status(400).json({ message: 'Session ID requis' });
+      }
+
+      const favoriteSession = await storage.addFavoriteSession({
+        userId,
+        sessionId,
+        customName,
+        customizedData
+      });
+
+      res.json(favoriteSession);
+    } catch (error: any) {
+      console.error('Error adding favorite session:', error);
+      res.status(500).json({ message: 'Erreur lors de l\'ajout de la séance favorite' });
+    }
+  });
+
+  // DELETE /api/patient-sessions/favorites/:id - Supprimer une séance favorite
+  app.delete('/api/patient-sessions/favorites/:id', requireAuth, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const userId = req.session.user!.id;
+
+      const success = await storage.deleteFavoriteSession(id, userId);
+
+      if (!success) {
+        return res.status(404).json({ message: 'Séance favorite non trouvée ou accès refusé' });
+      }
+
+      res.json({ message: 'Séance favorite supprimée avec succès' });
+    } catch (error: any) {
+      console.error('Error deleting favorite session:', error);
+      res.status(500).json({ message: 'Erreur lors de la suppression de la séance favorite' });
+    }
+  });
+
   // === GESTION DES EXERCICES AVANCÉS ===
   
   // PUT /api/exercises/:id - Mettre à jour un exercice (admin)
