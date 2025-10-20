@@ -154,7 +154,7 @@ export default function SessionDetail() {
   };
 
   const handleNextElement = () => {
-    if (!patientSession?.session.elements) return;
+    if (!patientSession?.session?.elements || !Array.isArray(patientSession.session.elements)) return;
     
     if (currentElementIndex < patientSession.session.elements.length - 1) {
       setCurrentElementIndex(prev => prev + 1);
@@ -244,8 +244,8 @@ export default function SessionDetail() {
     );
   }
 
-  const currentElement = patientSession.session.elements?.[currentElementIndex];
-  const progress = patientSession.session.elements ? 
+  const currentElement = patientSession?.session?.elements?.[currentElementIndex];
+  const progress = patientSession?.session?.elements && Array.isArray(patientSession.session.elements) ? 
     ((currentElementIndex + 1) / patientSession.session.elements.length) * 100 : 0;
 
   return (
@@ -285,7 +285,7 @@ export default function SessionDetail() {
             <div className="space-y-2">
               <div className="flex justify-between text-sm">
                 <span>Progression</span>
-                <span>{currentElementIndex + 1} / {patientSession.session.elements?.length || 0}</span>
+                <span>{currentElementIndex + 1} / {(patientSession?.session?.elements && Array.isArray(patientSession.session.elements)) ? patientSession.session.elements.length : 0}</span>
               </div>
               <Progress value={progress} className="h-2" />
             </div>
@@ -377,7 +377,7 @@ export default function SessionDetail() {
                         size="lg"
                         className="px-6"
                       >
-                        {currentElementIndex < (patientSession.session.elements?.length || 0) - 1 ? (
+                        {currentElementIndex < ((patientSession?.session?.elements && Array.isArray(patientSession.session.elements)) ? patientSession.session.elements.length : 0) - 1 ? (
                           <>
                             <SkipForward className="h-5 w-5 mr-2" />
                             Exercice suivant

@@ -31,6 +31,7 @@ import BeckAnalysisPage from "@/pages/beck-analysis-page";
 import StrategiesPage from "@/pages/strategies-page";
 import EmergencyRoutinePage from "@/pages/emergency-routine-page";
 import BreathingExercisePage from "@/pages/breathing-exercise-page";
+import SessionsPage from "@/pages/sessions-page";
 
 // Admin Page Imports
 import AdminDashboard from "@/pages/admin/dashboard";
@@ -104,6 +105,11 @@ function AppContent() {
       <Route path="/session/:sessionId">
         <ProtectedRoute>
           <SessionDetail />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/sessions">
+        <ProtectedRoute>
+          <SessionsPage />
         </ProtectedRoute>
       </Route>
       <Route path="/profile">
