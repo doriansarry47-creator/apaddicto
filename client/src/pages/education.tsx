@@ -305,7 +305,7 @@ export default function EducationNew() {
   const [, setLocation] = useLocation();
   
   // États pour la navigation et filtres
-  const [activeTab, setActiveTab] = useState("dashboard");
+  const [activeTab, setActiveTab] = useState("explore");
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
   const [searchTerm, setSearchTerm] = useState("");
   const [difficultyFilter, setDifficultyFilter] = useState<string>("all");
@@ -626,21 +626,21 @@ export default function EducationNew() {
           }
         }} className="w-full">
           <TabsList className="grid w-full grid-cols-4 mb-8">
-            <TabsTrigger value="dashboard" className="flex items-center gap-2">
-              <TrendingUp className="h-4 w-4" />
-              Tableau de Bord
-            </TabsTrigger>
             <TabsTrigger value="explore" className="flex items-center gap-2">
               <Search className="h-4 w-4" />
               Explorer
             </TabsTrigger>
             <TabsTrigger value="favorites" className="flex items-center gap-2">
               <Bookmark className="h-4 w-4" />
-              Favoris
+              Mes Ressources
             </TabsTrigger>
             <TabsTrigger value="completed" className="flex items-center gap-2">
               <Award className="h-4 w-4" />
-              Complétés
+              Historique
+            </TabsTrigger>
+            <TabsTrigger value="dashboard" className="flex items-center gap-2">
+              <TrendingUp className="h-4 w-4" />
+              Ma Progression
             </TabsTrigger>
           </TabsList>
 
