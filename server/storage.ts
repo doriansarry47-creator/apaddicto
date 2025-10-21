@@ -18,6 +18,8 @@ import type {
   UserStats,
   EmergencyRoutine,
   InsertEmergencyRoutine,
+  UserEmergencyRoutine,
+  InsertUserEmergencyRoutine,
   CustomSession,
   InsertCustomSession,
   PatientSession,
@@ -42,6 +44,7 @@ import {
   userStats,
   userBadges,
   emergencyRoutines,
+  userEmergencyRoutines,
   customSessions,
   sessionElements,
   patientSessions,
@@ -812,6 +815,81 @@ class Storage {
   }
 
   // === NOUVELLES MÉTHODES POUR LES FONCTIONNALITÉS AVANCÉES ===
+  
+  // === GESTION DES ROUTINES D'URGENCE UTILISATEUR ===
+  async getUserEmergencyRoutines(userId: string) {
+    try {
+      const result = await this.db
+        .select()
+        .from(userEmergencyRoutines)
+        .where(eq(userEmergencyRoutines.userId, userId))
+        .orderBy(desc(userEmergencyRoutines.createdAt));
+      return result;
+    } catch (error) {
+      console.error('Error fetching user emergency routines:', error);
+      return [];
+    }
+  }
+
+  async getUserEmergencyRoutineById(routineId: string) {
+    try {
+      const result = await this.db
+        .select()
+        .from(userEmergencyRoutines)
+        .where(eq(userEmergencyRoutines.id, routineId))
+        .limit(1);
+      return result[0] || null;
+    } catch (error) {
+      console.error('Error fetching user emergency routine by ID:', error);
+      return null;
+    }
+  }
+
+  async createUserEmergencyRoutine(routineData: InsertUserEmergencyRoutine) {
+    try {
+      const result = await this.db
+        .insert(userEmergencyRoutines)
+        .values({
+          ...routineData,
+          updatedAt: new Date(),
+        })
+        .returning();
+      return result[0];
+    } catch (error) {
+      console.error('Error creating user emergency routine:', error);
+      throw new Error('Failed to create user emergency routine');
+    }
+  }
+
+  async updateUserEmergencyRoutine(routineId: string, updateData: Partial<InsertUserEmergencyRoutine>) {
+    try {
+      const result = await this.db
+        .update(userEmergencyRoutines)
+        .set({
+          ...updateData,
+          updatedAt: new Date()
+        })
+        .where(eq(userEmergencyRoutines.id, routineId))
+        .returning();
+      return result[0];
+    } catch (error) {
+      console.error('Error updating user emergency routine:', error);
+      throw new Error('Failed to update user emergency routine');
+    }
+  }
+
+  async deleteUserEmergencyRoutine(routineId: string): Promise<boolean> {
+    try {
+      const result = await this.db
+        .delete(userEmergencyRoutines)
+        .where(eq(userEmergencyRoutines.id, routineId))
+        .returning();
+      return result.length > 0;
+    } catch (error) {
+      console.error('Error deleting user emergency routine:', error);
+      return false;
+    }
+  }
   
   // === GESTION DES SÉANCES ===
   async getSessions(filters: {
