@@ -8,6 +8,7 @@ var __export = (target, all) => {
 import "dotenv/config";
 import express from "express";
 import session from "express-session";
+import connectPgSimple from "connect-pg-simple";
 import cors from "cors";
 import path from "path";
 import { fileURLToPath } from "url";
@@ -3264,8 +3265,8 @@ async function run() {
     return;
   }
   console.log("\u{1F527} Migration runner: d\xE9marrage");
-  const pool3 = new Pool2({ connectionString: process.env.DATABASE_URL });
-  const db2 = drizzle2(pool3);
+  const pool2 = new Pool2({ connectionString: process.env.DATABASE_URL });
+  const db2 = drizzle2(pool2);
   try {
     await migrate(db2, { migrationsFolder: "migrations" });
     console.log("\u2705 Migrations Drizzle appliqu\xE9es (ou d\xE9j\xE0 \xE0 jour)");
@@ -3275,7 +3276,7 @@ async function run() {
   } catch (e) {
     console.error("\u274C Erreur migrations:", e);
   } finally {
-    await pool3.end();
+    await pool2.end();
   }
 }
 run();
@@ -3294,9 +3295,9 @@ function makePool() {
   return new Pool3({ connectionString: ensureDbUrl() });
 }
 debugTablesRouter.get("/debug/tables", async (_req, res) => {
-  const pool3 = makePool();
+  const pool2 = makePool();
   try {
-    const tables = await pool3.query(`
+    const tables = await pool2.query(`
       SELECT table_name
       FROM information_schema.tables
       WHERE table_schema = 'public'
@@ -3306,13 +3307,13 @@ debugTablesRouter.get("/debug/tables", async (_req, res) => {
   } catch (e) {
     res.status(500).json({ error: e.message });
   } finally {
-    await pool3.end();
+    await pool2.end();
   }
 });
 debugTablesRouter.get("/debug/tables/counts", async (_req, res) => {
-  const pool3 = makePool();
+  const pool2 = makePool();
   try {
-    const tables = await pool3.query(`
+    const tables = await pool2.query(`
       SELECT table_name
       FROM information_schema.tables
       WHERE table_schema = 'public'
@@ -3321,23 +3322,23 @@ debugTablesRouter.get("/debug/tables/counts", async (_req, res) => {
     const out = {};
     for (const row of tables.rows) {
       const tableName = row.table_name;
-      const count2 = await pool3.query(`SELECT COUNT(*)::int AS c FROM "${tableName}";`);
+      const count2 = await pool2.query(`SELECT COUNT(*)::int AS c FROM "${tableName}";`);
       out[tableName] = count2.rows[0].c;
     }
     res.json(out);
   } catch (e) {
     res.status(500).json({ error: e.message });
   } finally {
-    await pool3.end();
+    await pool2.end();
   }
 });
 debugTablesRouter.delete("/debug/tables/purge", async (_req, res) => {
   if (process.env.NODE_ENV === "production") {
     return res.status(403).json({ error: "Purge interdite en production" });
   }
-  const pool3 = makePool();
+  const pool2 = makePool();
   try {
-    const tables = await pool3.query(`
+    const tables = await pool2.query(`
       SELECT table_name
       FROM information_schema.tables
       WHERE table_schema = 'public'
@@ -3346,13 +3347,13 @@ debugTablesRouter.delete("/debug/tables/purge", async (_req, res) => {
     `);
     for (const row of tables.rows) {
       const tableName = row.table_name;
-      await pool3.query(`TRUNCATE TABLE "${tableName}" RESTART IDENTITY CASCADE;`);
+      await pool2.query(`TRUNCATE TABLE "${tableName}" RESTART IDENTITY CASCADE;`);
     }
     res.json({ ok: true });
   } catch (e) {
     res.status(500).json({ error: e.message });
   } finally {
-    await pool3.end();
+    await pool2.end();
   }
 });
 
@@ -3370,14 +3371,25 @@ app.use(express.json());
 var distPath = path.join(__dirname, "..", "dist");
 console.log("\u{1F4C1} Serving static files from:", distPath);
 app.use(express.static(distPath));
+var pgPool = new Pool4({
+  connectionString: process.env.DATABASE_URL
+});
+var PgSession = connectPgSimple(session);
 app.use(session({
+  store: new PgSession({
+    pool: pgPool,
+    tableName: "session",
+    createTableIfMissing: true
+  }),
   secret: process.env.SESSION_SECRET || "fallback-secret",
   resave: false,
   saveUninitialized: false,
   cookie: {
-    sameSite: "lax",
-    secure: false,
-    maxAge: 1e3 * 60 * 60 * 24 * 7
+    sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
+    secure: process.env.NODE_ENV === "production",
+    maxAge: 1e3 * 60 * 60 * 24 * 7,
+    // 7 jours
+    httpOnly: true
   }
 }));
 app.get("/api/health", (_req, res) => {
@@ -3389,12 +3401,9 @@ app.get("/api/health", (_req, res) => {
 });
 registerRoutes(app);
 app.use("/api", debugTablesRouter);
-var pool2 = new Pool4({
-  connectionString: process.env.DATABASE_URL
-});
 app.get("/api/tables", async (_req, res) => {
   try {
-    const result = await pool2.query(`
+    const result = await pgPool.query(`
       SELECT table_name
       FROM information_schema.tables
       WHERE table_schema = 'public'
@@ -3420,7 +3429,7 @@ app.get("/api/data", async (_req, res) => {
     ];
     const data = {};
     for (const table of tables) {
-      const result = await pool2.query(`SELECT * FROM ${table};`);
+      const result = await pgPool.query(`SELECT * FROM ${table};`);
       data[table] = result.rows;
     }
     res.json(data);
