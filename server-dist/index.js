@@ -770,7 +770,9 @@ var Storage = class {
   db = getDB();
   // === USERS ===
   async getUserByEmail(email) {
+    console.log("[STORAGE] Looking for user with email:", email);
     const result = await this.db.select().from(users).where(eq(users.email, email)).limit(1);
+    console.log("[STORAGE] Found:", result.length > 0 ? result[0].email : "none");
     return result[0] || null;
   }
   async createUser(userData) {
@@ -1893,17 +1895,24 @@ var AuthService = class {
     };
   }
   static async login(email, password) {
+    console.log("[AUTH] Login attempt for:", email);
     const user = await storage.getUserByEmail(email);
     if (!user) {
+      console.log("[AUTH] User not found:", email);
       throw new Error("Email ou mot de passe incorrect");
     }
+    console.log("[AUTH] User found:", user.email, "Role:", user.role);
+    console.log("[AUTH] Verifying password...");
     const isValidPassword = await this.verifyPassword(password, user.password);
+    console.log("[AUTH] Password valid:", isValidPassword);
     if (!isValidPassword) {
       throw new Error("Email ou mot de passe incorrect");
     }
     if (!user.isActive) {
+      console.log("[AUTH] User inactive:", email);
       throw new Error("Compte d\xE9sactiv\xE9");
     }
+    console.log("[AUTH] Login successful for:", email);
     await storage.updateUserLastLogin(user.id);
     return {
       id: user.id,
@@ -3362,15 +3371,7 @@ import { Pool as Pool4 } from "pg";
 var __filename = fileURLToPath(import.meta.url);
 var __dirname = path.dirname(__filename);
 var app = express();
-var CORS_ORIGIN = process.env.CORS_ORIGIN || "*";
-app.use(cors({
-  origin: CORS_ORIGIN === "*" ? true : CORS_ORIGIN.split(","),
-  credentials: true
-}));
-app.use(express.json());
-var distPath = path.join(__dirname, "..", "dist");
-console.log("\u{1F4C1} Serving static files from:", distPath);
-app.use(express.static(distPath));
+app.set("trust proxy", 1);
 var pgPool = new Pool4({
   connectionString: process.env.DATABASE_URL
 });
@@ -3392,6 +3393,15 @@ app.use(session({
     httpOnly: true
   }
 }));
+var CORS_ORIGIN = process.env.CORS_ORIGIN || "*";
+app.use(cors({
+  origin: CORS_ORIGIN === "*" ? true : CORS_ORIGIN.split(","),
+  credentials: true
+}));
+app.use(express.json());
+var distPath = path.join(__dirname, "..", "dist");
+console.log("\u{1F4C1} Serving static files from:", distPath);
+app.use(express.static(distPath));
 app.get("/api/health", (_req, res) => {
   res.json({
     status: "ok",

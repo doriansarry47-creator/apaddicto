@@ -65,23 +65,34 @@ export class AuthService {
   }
 
   static async login(email: string, password: string): Promise<AuthUser> {
+    console.log('[AUTH] Login attempt for:', email);
+    
     // Trouver l'utilisateur par email
     const user = await storage.getUserByEmail(email);
     if (!user) {
+      console.log('[AUTH] User not found:', email);
       throw new Error('Email ou mot de passe incorrect');
     }
+    
+    console.log('[AUTH] User found:', user.email, 'Role:', user.role);
 
     // Vérifier le mot de passe
+    console.log('[AUTH] Verifying password...');
     const isValidPassword = await this.verifyPassword(password, user.password);
+    console.log('[AUTH] Password valid:', isValidPassword);
+    
     if (!isValidPassword) {
       throw new Error('Email ou mot de passe incorrect');
     }
 
     // Vérifier si l'utilisateur est actif
     if (!user.isActive) {
+      console.log('[AUTH] User inactive:', email);
       throw new Error('Compte désactivé');
     }
 
+    console.log('[AUTH] Login successful for:', email);
+    
     // Mettre à jour la dernière connexion
     await storage.updateUserLastLogin(user.id);
 

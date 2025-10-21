@@ -57,7 +57,9 @@ class Storage {
 
   // === USERS ===
   async getUserByEmail(email: string): Promise<User | null> {
+    console.log('[STORAGE] Looking for user with email:', email);
     const result = await this.db.select().from(users).where(eq(users.email, email)).limit(1);
+    console.log('[STORAGE] Found:', result.length > 0 ? result[0].email : 'none');
     return result[0] || null;
   }
 

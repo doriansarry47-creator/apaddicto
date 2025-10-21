@@ -9,7 +9,7 @@
       }
     },
     {
-      "src": "server-dist/index.js",
+      "src": "api/index.ts",
       "use": "@vercel/node",
       "config": {
         "maxDuration": 30,
@@ -19,8 +19,12 @@
   ],
   "routes": [
     {
-      "src": "/server-dist/(.*)",
-      "dest": "/server-dist/index.js"
+      "src": "/api/(.*)",
+      "dest": "/api/index.ts"
+    },
+    {
+      "src": "/health",
+      "dest": "/api/index.ts"
     },
     {
       "handle": "filesystem"
