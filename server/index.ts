@@ -1,6 +1,7 @@
 import 'dotenv/config';
 import express from 'express';
 import session from 'express-session';
+import connectPgSimple from 'connect-pg-simple';
 import cors from 'cors';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -31,15 +32,29 @@ const distPath = path.join(__dirname, '..', 'dist');
 console.log('📁 Serving static files from:', distPath);
 app.use(express.static(distPath));
 
+// === CONNEXION POSTGRES POUR SESSION ===
+const pgPool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+});
+
+// Initialiser le store de session PostgreSQL
+const PgSession = connectPgSimple(session);
+
 // === SESSION ===
 app.use(session({
+  store: new PgSession({
+    pool: pgPool,
+    tableName: 'session',
+    createTableIfMissing: true,
+  }),
   secret: process.env.SESSION_SECRET || 'fallback-secret',
   resave: false,
   saveUninitialized: false,
   cookie: {
-    sameSite: 'lax',
-    secure: false,
-    maxAge: 1000 * 60 * 60 * 24 * 7,
+    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+    secure: process.env.NODE_ENV === 'production',
+    maxAge: 1000 * 60 * 60 * 24 * 7, // 7 jours
+    httpOnly: true,
   },
 }));
 
@@ -56,15 +71,10 @@ app.get('/api/health', (_req, res) => {
 registerRoutes(app);
 app.use('/api', debugTablesRouter);
 
-// === CONNEXION POSTGRES ===
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-});
-
 // === ENDPOINT POUR LISTER LES TABLES ===
 app.get('/api/tables', async (_req, res) => {
   try {
-    const result = await pool.query(`
+    const result = await pgPool.query(`
       SELECT table_name
       FROM information_schema.tables
       WHERE table_schema = 'public'
@@ -94,7 +104,7 @@ app.get('/api/data', async (_req, res) => {
     const data: Record<string, any[]> = {};
 
     for (const table of tables) {
-      const result = await pool.query(`SELECT * FROM ${table};`);
+      const result = await pgPool.query(`SELECT * FROM ${table};`);
       data[table] = result.rows;
     }
 
