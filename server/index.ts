@@ -1,7 +1,7 @@
 import 'dotenv/config';
 import express from 'express';
 import session from 'express-session';
-import connectPgSimple from 'connect-pg-simple';
+import connectPgSimple from 'connect-pg-simple'; // Import manquant
 import cors from 'cors';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -17,20 +17,8 @@ const __dirname = path.dirname(__filename);
 // === INITIALISATION EXPRESS ===
 const app = express();
 
-// === CONFIG CORS ===
-const CORS_ORIGIN = process.env.CORS_ORIGIN || '*';
-app.use(cors({
-  origin: CORS_ORIGIN === '*' ? true : CORS_ORIGIN.split(','),
-  credentials: true,
-}));
-
-// === PARSING JSON ===
-app.use(express.json());
-
-// === SERVIR LES FICHIERS STATIQUES ===
-const distPath = path.join(__dirname, '..', 'dist');
-console.log('📁 Serving static files from:', distPath);
-app.use(express.static(distPath));
+// === CONFIGURATION DU PROXY POUR VERCEL ET SESSIONS SÉCURISÉES ===
+app.set('trust proxy', 1);
 
 // === CONNEXION POSTGRES POUR SESSION ===
 const pgPool = new Pool({
@@ -58,6 +46,21 @@ app.use(session({
   },
 }));
 
+// === CONFIG CORS ===
+const CORS_ORIGIN = process.env.CORS_ORIGIN || '*';
+app.use(cors({
+  origin: CORS_ORIGIN === '*' ? true : CORS_ORIGIN.split(','),
+  credentials: true,
+}));
+
+// === PARSING JSON ===
+app.use(express.json());
+
+// === SERVIR LES FICHIERS STATIQUES ===
+const distPath = path.join(__dirname, '..', 'dist');
+console.log('📁 Serving static files from:', distPath);
+app.use(express.static(distPath));
+
 // === ENDPOINTS DE BASE ===
 app.get('/api/health', (_req, res) => {
   res.json({
@@ -70,6 +73,10 @@ app.get('/api/health', (_req, res) => {
 // === ROUTES DE L'APPLICATION ===
 registerRoutes(app);
 app.use('/api', debugTablesRouter);
+
+// === CONNEXION POSTGRES ===
+// Le pool est déjà défini pour la session, réutiliser ou définir un nouveau si nécessaire
+// Ici, nous allons le réutiliser pour les autres requêtes DB
 
 // === ENDPOINT POUR LISTER LES TABLES ===
 app.get('/api/tables', async (_req, res) => {
@@ -140,3 +147,4 @@ const port = process.env.PORT || 3000;
 app.listen(port, '0.0.0.0', () => {
   console.log(`🚀 Server running at http://localhost:${port}`);
 });
+
