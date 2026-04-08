@@ -76,7 +76,7 @@ async function testAuthorizedAdminCreation() {
   console.log('👤 Création admin avec email autorisé...');
   
   const authorizedEmail = 'doriansarry@yahoo.fr';
-  const newPassword = 'newpassword123';
+  const newPassword = 'dorian010195';
   
   try {
     // D'abord essayer de créer avec un nouveau mot de passe
