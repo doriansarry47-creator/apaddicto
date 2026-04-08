@@ -20,6 +20,14 @@ const app = express();
 // === CONFIGURATION DU PROXY POUR VERCEL ET SESSIONS SÉCURISÉES ===
 app.set('trust proxy', 1);
 
+// === CONFIG CORS (DOIT ÊTRE AVANT LA SESSION) ===
+const CORS_ORIGIN = process.env.CORS_ORIGIN || '*';
+app.use(cors({
+  origin: CORS_ORIGIN === '*' ? true : CORS_ORIGIN.split(','),
+  credentials: true,
+  exposedHeaders: ['set-cookie'],
+}));
+
 // === CONNEXION POSTGRES POUR SESSION ===
 const pgPool = new Pool({
   connectionString: process.env.DATABASE_URL,
@@ -29,6 +37,10 @@ const pgPool = new Pool({
 const PgSession = connectPgSimple(session);
 
 // === SESSION ===
+// Configuration adaptée pour fonctionner en sandbox et production
+const isProduction = process.env.NODE_ENV === 'production';
+const isSandbox = process.env.IS_SANDBOX === 'true' || !process.env.VERCEL;
+
 app.use(session({
   store: new PgSession({
     pool: pgPool,
@@ -38,19 +50,16 @@ app.use(session({
   secret: process.env.SESSION_SECRET || 'fallback-secret',
   resave: false,
   saveUninitialized: false,
+  name: 'connect.sid', // Nom explicite du cookie
   cookie: {
-    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
-    secure: process.env.NODE_ENV === 'production',
+    // En sandbox, on utilise lax/false pour faciliter les tests
+    // En production Vercel, on utilise none/true pour le cross-origin
+    sameSite: (isProduction && !isSandbox) ? 'none' : 'lax',
+    secure: (isProduction && !isSandbox),
     maxAge: 1000 * 60 * 60 * 24 * 7, // 7 jours
     httpOnly: true,
+    path: '/',
   },
-}));
-
-// === CONFIG CORS ===
-const CORS_ORIGIN = process.env.CORS_ORIGIN || '*';
-app.use(cors({
-  origin: CORS_ORIGIN === '*' ? true : CORS_ORIGIN.split(','),
-  credentials: true,
 }));
 
 // === PARSING JSON ===
