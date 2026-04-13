@@ -76,6 +76,11 @@ export class AuthService {
     
     console.log('[AUTH] User found:', user.email, 'Role:', user.role);
 
+    // Vérifier si c'est un compte Google (pas de mot de passe)
+    if (!user.password || user.password === '') {
+      throw new Error('Ce compte utilise la connexion Google. Veuillez vous connecter avec Google.');
+    }
+
     // Vérifier le mot de passe
     console.log('[AUTH] Verifying password...');
     const isValidPassword = await this.verifyPassword(password, user.password);

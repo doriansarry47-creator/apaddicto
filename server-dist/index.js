@@ -90,10 +90,12 @@ import { createInsertSchema } from "drizzle-zod";
 var users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   email: varchar("email").unique().notNull(),
-  password: varchar("password").notNull(),
+  password: varchar("password").notNull().default(""),
   firstName: varchar("first_name"),
   lastName: varchar("last_name"),
   profileImageUrl: varchar("profile_image_url"),
+  googleId: varchar("google_id").unique(),
+  // Google OAuth ID
   role: varchar("role").default("patient"),
   // 'patient' or 'admin'
   level: integer("level").default(1),
@@ -797,6 +799,30 @@ var Storage = class {
   async updatePassword(id, hashedPassword) {
     await this.db.update(users).set({ password: hashedPassword, updatedAt: /* @__PURE__ */ new Date() }).where(eq(users.id, id));
   }
+  async getUserByGoogleId(googleId) {
+    const result = await this.db.select().from(users).where(eq(users.googleId, googleId)).limit(1);
+    return result[0] || null;
+  }
+  async createGoogleUser(data) {
+    const result = await this.db.insert(users).values({
+      email: data.email,
+      password: "",
+      // No password for Google users
+      firstName: data.firstName || null,
+      lastName: data.lastName || null,
+      googleId: data.googleId,
+      profileImageUrl: data.profileImageUrl || null,
+      role: "patient"
+    }).returning();
+    return result[0];
+  }
+  async linkGoogleAccount(userId, googleId, profileImageUrl) {
+    await this.db.update(users).set({
+      googleId,
+      profileImageUrl: profileImageUrl || void 0,
+      updatedAt: /* @__PURE__ */ new Date()
+    }).where(eq(users.id, userId));
+  }
   async getAllUsers() {
     const result = await this.db.select({
       id: users.id,
@@ -1277,6 +1303,58 @@ var Storage = class {
     }
   }
   // === NOUVELLES MÉTHODES POUR LES FONCTIONNALITÉS AVANCÉES ===
+  // === GESTION DES ROUTINES D'URGENCE UTILISATEUR ===
+  async getUserEmergencyRoutines(userId) {
+    try {
+      const result = await this.db.select().from(userEmergencyRoutines).where(eq(userEmergencyRoutines.userId, userId)).orderBy(desc(userEmergencyRoutines.createdAt));
+      return result;
+    } catch (error) {
+      console.error("Error fetching user emergency routines:", error);
+      return [];
+    }
+  }
+  async getUserEmergencyRoutineById(routineId) {
+    try {
+      const result = await this.db.select().from(userEmergencyRoutines).where(eq(userEmergencyRoutines.id, routineId)).limit(1);
+      return result[0] || null;
+    } catch (error) {
+      console.error("Error fetching user emergency routine by ID:", error);
+      return null;
+    }
+  }
+  async createUserEmergencyRoutine(routineData) {
+    try {
+      const result = await this.db.insert(userEmergencyRoutines).values({
+        ...routineData,
+        updatedAt: /* @__PURE__ */ new Date()
+      }).returning();
+      return result[0];
+    } catch (error) {
+      console.error("Error creating user emergency routine:", error);
+      throw new Error("Failed to create user emergency routine");
+    }
+  }
+  async updateUserEmergencyRoutine(routineId, updateData) {
+    try {
+      const result = await this.db.update(userEmergencyRoutines).set({
+        ...updateData,
+        updatedAt: /* @__PURE__ */ new Date()
+      }).where(eq(userEmergencyRoutines.id, routineId)).returning();
+      return result[0];
+    } catch (error) {
+      console.error("Error updating user emergency routine:", error);
+      throw new Error("Failed to update user emergency routine");
+    }
+  }
+  async deleteUserEmergencyRoutine(routineId) {
+    try {
+      const result = await this.db.delete(userEmergencyRoutines).where(eq(userEmergencyRoutines.id, routineId)).returning();
+      return result.length > 0;
+    } catch (error) {
+      console.error("Error deleting user emergency routine:", error);
+      return false;
+    }
+  }
   // === GESTION DES SÉANCES ===
   async getSessions(filters) {
     try {
@@ -1902,6 +1980,9 @@ var AuthService = class {
       throw new Error("Email ou mot de passe incorrect");
     }
     console.log("[AUTH] User found:", user.email, "Role:", user.role);
+    if (!user.password || user.password === "") {
+      throw new Error("Ce compte utilise la connexion Google. Veuillez vous connecter avec Google.");
+    }
     console.log("[AUTH] Verifying password...");
     const isValidPassword = await this.verifyPassword(password, user.password);
     console.log("[AUTH] Password valid:", isValidPassword);
@@ -2603,7 +2684,7 @@ function registerRoutes(app2) {
   });
   app2.get("/api/emergency-routines", requireAuth, async (req, res) => {
     try {
-      const routines = await storage.getEmergencyRoutines(req.session.user.id);
+      const routines = await storage.getUserEmergencyRoutines(req.session.user.id);
       res.json(routines);
     } catch (error) {
       console.error("Error fetching emergency routines:", error);
@@ -2612,10 +2693,16 @@ function registerRoutes(app2) {
   });
   app2.post("/api/emergency-routines", requireAuth, async (req, res) => {
     try {
-      if (req.session.user.role !== "admin") {
-        return res.status(403).json({ message: "Seuls les admins peuvent cr\xE9er des routines d'urgence" });
+      const userId = req.session.user.id;
+      const isAdmin = req.session.user.role === "admin";
+      if (!isAdmin && req.body.userId && req.body.userId !== userId) {
+        return res.status(403).json({ message: "Vous ne pouvez cr\xE9er des routines que pour vous-m\xEAme" });
       }
-      const routine = await storage.createEmergencyRoutine(req.body);
+      const routineData = {
+        ...req.body,
+        userId: req.body.userId || userId
+      };
+      const routine = await storage.createUserEmergencyRoutine(routineData);
       res.json(routine);
     } catch (error) {
       console.error("Error creating emergency routine:", error);
@@ -2625,14 +2712,16 @@ function registerRoutes(app2) {
   app2.put("/api/emergency-routines/:id", requireAuth, async (req, res) => {
     try {
       const { id } = req.params;
-      if (req.session.user.role !== "admin") {
-        return res.status(403).json({ message: "Seuls les admins peuvent modifier les routines d'urgence" });
-      }
-      const existingRoutine = await storage.getEmergencyRoutineById(id);
+      const userId = req.session.user.id;
+      const isAdmin = req.session.user.role === "admin";
+      const existingRoutine = await storage.getUserEmergencyRoutineById(id);
       if (!existingRoutine) {
         return res.status(404).json({ message: "Routine non trouv\xE9e" });
       }
-      const routine = await storage.updateEmergencyRoutine(id, req.body);
+      if (!isAdmin && existingRoutine.userId !== userId) {
+        return res.status(403).json({ message: "Vous ne pouvez modifier que vos propres routines" });
+      }
+      const routine = await storage.updateUserEmergencyRoutine(id, req.body);
       res.json(routine);
     } catch (error) {
       console.error("Error updating emergency routine:", error);
@@ -2642,14 +2731,16 @@ function registerRoutes(app2) {
   app2.delete("/api/emergency-routines/:id", requireAuth, async (req, res) => {
     try {
       const { id } = req.params;
-      if (req.session.user.role !== "admin") {
-        return res.status(403).json({ message: "Seuls les admins peuvent supprimer les routines d'urgence" });
-      }
-      const existingRoutine = await storage.getEmergencyRoutineById(id);
+      const userId = req.session.user.id;
+      const isAdmin = req.session.user.role === "admin";
+      const existingRoutine = await storage.getUserEmergencyRoutineById(id);
       if (!existingRoutine) {
         return res.status(404).json({ message: "Routine non trouv\xE9e" });
       }
-      const success = await storage.deleteEmergencyRoutine(id);
+      if (!isAdmin && existingRoutine.userId !== userId) {
+        return res.status(403).json({ message: "Vous ne pouvez supprimer que vos propres routines" });
+      }
+      const success = await storage.deleteUserEmergencyRoutine(id);
       if (success) {
         res.json({ message: "Routine d'urgence supprim\xE9e avec succ\xE8s" });
       } else {
@@ -3135,6 +3226,109 @@ function registerRoutes(app2) {
   console.log("\u2705 All routes registered successfully");
 }
 
+// server/google-auth.ts
+import passport from "passport";
+import { Strategy as GoogleStrategy } from "passport-google-oauth20";
+function registerGoogleAuthRoutes(app2) {
+  const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
+  const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET;
+  const BASE_URL = process.env.BASE_URL || "http://localhost:5000";
+  if (!GOOGLE_CLIENT_ID || !GOOGLE_CLIENT_SECRET) {
+    console.log("\u26A0\uFE0F  Google OAuth not configured (GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET missing). Skipping Google auth routes.");
+    app2.get("/api/auth/google", (_req, res) => {
+      res.redirect("/?error=google_not_configured");
+    });
+    app2.get("/api/auth/google/callback", (_req, res) => {
+      res.redirect("/?error=google_not_configured");
+    });
+    return;
+  }
+  passport.use(
+    new GoogleStrategy(
+      {
+        clientID: GOOGLE_CLIENT_ID,
+        clientSecret: GOOGLE_CLIENT_SECRET,
+        callbackURL: `${BASE_URL}/api/auth/google/callback`,
+        scope: ["profile", "email"]
+      },
+      async (_accessToken, _refreshToken, profile, done) => {
+        try {
+          const googleId = profile.id;
+          const email = profile.emails?.[0]?.value;
+          const firstName = profile.name?.givenName;
+          const lastName = profile.name?.familyName;
+          const profileImageUrl = profile.photos?.[0]?.value;
+          if (!email) {
+            return done(new Error("Impossible de r\xE9cup\xE9rer l'email depuis Google"), void 0);
+          }
+          let user = await storage.getUserByGoogleId(googleId);
+          if (!user) {
+            const existingByEmail = await storage.getUserByEmail(email);
+            if (existingByEmail) {
+              await storage.linkGoogleAccount(existingByEmail.id, googleId, profileImageUrl);
+              user = await storage.getUser(existingByEmail.id);
+            } else {
+              user = await storage.createGoogleUser({
+                email,
+                firstName,
+                lastName,
+                googleId,
+                profileImageUrl
+              });
+            }
+          }
+          if (!user) {
+            return done(new Error("Erreur lors de la cr\xE9ation du compte"), void 0);
+          }
+          await storage.updateUserLastLogin(user.id);
+          const authUser = {
+            id: user.id,
+            email: user.email,
+            firstName: user.firstName,
+            lastName: user.lastName,
+            role: user.role
+          };
+          return done(null, authUser);
+        } catch (error) {
+          console.error("[GOOGLE AUTH] Error:", error);
+          return done(error, void 0);
+        }
+      }
+    )
+  );
+  app2.use(passport.initialize());
+  app2.get(
+    "/api/auth/google",
+    passport.authenticate("google", {
+      scope: ["profile", "email"],
+      session: false
+    })
+  );
+  app2.get(
+    "/api/auth/google/callback",
+    passport.authenticate("google", {
+      session: false,
+      failureRedirect: "/login?error=google_failed"
+    }),
+    (req, res) => {
+      const user = req.user;
+      if (!user) {
+        return res.redirect("/login?error=google_failed");
+      }
+      req.session.user = user;
+      req.session.save((err) => {
+        if (err) {
+          console.error("[GOOGLE AUTH] Session save error:", err);
+          return res.redirect("/login?error=session_error");
+        }
+        console.log("\u2705 Google login successful for:", user.email);
+        res.redirect("/");
+      });
+    }
+  );
+  console.log("\u2705 Google OAuth routes registered");
+}
+
 // server/migrate.ts
 import "dotenv/config";
 import { drizzle as drizzle2 } from "drizzle-orm/node-postgres";
@@ -3264,6 +3458,36 @@ async function ensureUsersUpdates() {
     await client.end();
   }
 }
+async function ensureGoogleAuthColumn() {
+  const client = new Client({
+    connectionString: process.env.DATABASE_URL
+  });
+  try {
+    await client.connect();
+    console.log("\u{1F527} V\xE9rification colonne google_id pour OAuth Google...");
+    await client.query(`
+      DO $$ 
+      BEGIN
+          IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                         WHERE table_name = 'users' AND column_name = 'google_id') THEN
+              ALTER TABLE users ADD COLUMN google_id VARCHAR UNIQUE;
+          END IF;
+          
+          IF EXISTS (SELECT 1 FROM information_schema.columns 
+                     WHERE table_name = 'users' AND column_name = 'password'
+                     AND is_nullable = 'NO') THEN
+              ALTER TABLE users ALTER COLUMN password DROP NOT NULL;
+              ALTER TABLE users ALTER COLUMN password SET DEFAULT '';
+          END IF;
+      END $$;
+    `);
+    console.log("\u2705 Colonne google_id v\xE9rifi\xE9e/ajout\xE9e");
+  } catch (error) {
+    console.error("\u274C Erreur lors de l'ajout de google_id:", error);
+  } finally {
+    await client.end();
+  }
+}
 async function run() {
   if (!process.env.DATABASE_URL) {
     console.error("\u274C DATABASE_URL manquant");
@@ -3282,6 +3506,7 @@ async function run() {
     await ensureAntiCravingTable();
     await ensureExerciseSessionsUpdates();
     await ensureUsersUpdates();
+    await ensureGoogleAuthColumn();
   } catch (e) {
     console.error("\u274C Erreur migrations:", e);
   } finally {
@@ -3372,10 +3597,18 @@ var __filename = fileURLToPath(import.meta.url);
 var __dirname = path.dirname(__filename);
 var app = express();
 app.set("trust proxy", 1);
+var CORS_ORIGIN = process.env.CORS_ORIGIN || "*";
+app.use(cors({
+  origin: CORS_ORIGIN === "*" ? true : CORS_ORIGIN.split(","),
+  credentials: true,
+  exposedHeaders: ["set-cookie"]
+}));
 var pgPool = new Pool4({
   connectionString: process.env.DATABASE_URL
 });
 var PgSession = connectPgSimple(session);
+var isProduction = process.env.NODE_ENV === "production";
+var isSandbox = process.env.IS_SANDBOX === "true" || !process.env.VERCEL;
 app.use(session({
   store: new PgSession({
     pool: pgPool,
@@ -3385,18 +3618,18 @@ app.use(session({
   secret: process.env.SESSION_SECRET || "fallback-secret",
   resave: false,
   saveUninitialized: false,
+  name: "connect.sid",
+  // Nom explicite du cookie
   cookie: {
-    sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
-    secure: process.env.NODE_ENV === "production",
+    // En sandbox, on utilise lax/false pour faciliter les tests
+    // En production Vercel, on utilise none/true pour le cross-origin
+    sameSite: isProduction && !isSandbox ? "none" : "lax",
+    secure: isProduction && !isSandbox,
     maxAge: 1e3 * 60 * 60 * 24 * 7,
     // 7 jours
-    httpOnly: true
+    httpOnly: true,
+    path: "/"
   }
-}));
-var CORS_ORIGIN = process.env.CORS_ORIGIN || "*";
-app.use(cors({
-  origin: CORS_ORIGIN === "*" ? true : CORS_ORIGIN.split(","),
-  credentials: true
 }));
 app.use(express.json());
 var distPath = path.join(__dirname, "..", "dist");
@@ -3410,6 +3643,7 @@ app.get("/api/health", (_req, res) => {
   });
 });
 registerRoutes(app);
+registerGoogleAuthRoutes(app);
 app.use("/api", debugTablesRouter);
 app.get("/api/tables", async (_req, res) => {
   try {

@@ -104,6 +104,32 @@ class Storage {
       .where(eq(users.id, id));
   }
 
+  async getUserByGoogleId(googleId: string): Promise<User | null> {
+    const result = await this.db.select().from(users).where(eq(users.googleId, googleId)).limit(1);
+    return result[0] || null;
+  }
+
+  async createGoogleUser(data: { email: string; firstName?: string; lastName?: string; googleId: string; profileImageUrl?: string }): Promise<User> {
+    const result = await this.db.insert(users).values({
+      email: data.email,
+      password: '', // No password for Google users
+      firstName: data.firstName || null,
+      lastName: data.lastName || null,
+      googleId: data.googleId,
+      profileImageUrl: data.profileImageUrl || null,
+      role: 'patient',
+    }).returning();
+    return result[0];
+  }
+
+  async linkGoogleAccount(userId: string, googleId: string, profileImageUrl?: string): Promise<void> {
+    await this.db.update(users).set({
+      googleId,
+      profileImageUrl: profileImageUrl || undefined,
+      updatedAt: new Date(),
+    }).where(eq(users.id, userId));
+  }
+
   async getAllUsers(): Promise<Omit<User, 'password'>[]> {
     const result = await this.db.select({
       id: users.id,

@@ -6,6 +6,7 @@ import cors from 'cors';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { registerRoutes } from './routes.js';
+import { registerGoogleAuthRoutes } from './google-auth.js';
 import './migrate.js';
 import { debugTablesRouter } from './debugTables.js';
 import { Pool } from 'pg';
@@ -81,6 +82,7 @@ app.get('/api/health', (_req, res) => {
 
 // === ROUTES DE L'APPLICATION ===
 registerRoutes(app);
+registerGoogleAuthRoutes(app);
 app.use('/api', debugTablesRouter);
 
 // === CONNEXION POSTGRES ===
