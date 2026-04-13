@@ -155,6 +155,40 @@ async function ensureUsersUpdates() {
   }
 }
 
+async function ensureGoogleAuthColumn() {
+  const client = new Client({
+    connectionString: process.env.DATABASE_URL
+  });
+
+  try {
+    await client.connect();
+    console.log('🔧 Vérification colonne google_id pour OAuth Google...');
+    
+    await client.query(`
+      DO $$ 
+      BEGIN
+          IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                         WHERE table_name = 'users' AND column_name = 'google_id') THEN
+              ALTER TABLE users ADD COLUMN google_id VARCHAR UNIQUE;
+          END IF;
+          
+          IF EXISTS (SELECT 1 FROM information_schema.columns 
+                     WHERE table_name = 'users' AND column_name = 'password'
+                     AND is_nullable = 'NO') THEN
+              ALTER TABLE users ALTER COLUMN password DROP NOT NULL;
+              ALTER TABLE users ALTER COLUMN password SET DEFAULT '';
+          END IF;
+      END $$;
+    `);
+    
+    console.log('✅ Colonne google_id vérifiée/ajoutée');
+  } catch (error) {
+    console.error('❌ Erreur lors de l\'ajout de google_id:', error);
+  } finally {
+    await client.end();
+  }
+}
+
 async function run() {
   if (!process.env.DATABASE_URL) {
     console.error('❌ DATABASE_URL manquant');
@@ -179,6 +213,9 @@ async function run() {
     
     // Appliquer les mises à jour pour users
     await ensureUsersUpdates();
+    
+    // Ajouter le support Google OAuth
+    await ensureGoogleAuthColumn();
     
   } catch (e) {
     console.error('❌ Erreur migrations:', e);
