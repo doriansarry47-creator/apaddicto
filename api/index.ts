@@ -7,6 +7,7 @@ import { registerRoutes } from '../server/routes.js';
 import '../server/migrate.js';
 import { debugTablesRouter } from '../server/debugTables.js';
 import { vercelSessionMiddleware } from '../server/vercel-session.js';
+import { registerGoogleAuthRoutes } from '../server/google-auth.js';
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 
 // Créer l'application Express
@@ -45,6 +46,7 @@ app.get('/health', (_req, res) => {
 
 // Enregistrer toutes les routes de l'application
 registerRoutes(app);
+registerGoogleAuthRoutes(app);
 app.use('/debug', debugTablesRouter);
 
 // Middleware de gestion d'erreurs

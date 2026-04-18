@@ -1013,7 +1013,6 @@ Résumez les points essentiels et donnez des pistes d'action."
                   </div>
                 </div>
               </form>
-              </div>
             </CardContent>
           </Card>
         </div>

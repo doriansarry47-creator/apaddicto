@@ -68,7 +68,7 @@ export default function MarkdownEditor({
     
     // Bold and Italic
     html = html.replace(/\*\*(.*?)\*\*/g, '<strong class="font-semibold">$1</strong>');
-    html = html.replace/\*(.*?)\*/g, '<em class="italic">$1</em>');
+    html = html.replace(/\*(.*?)\*/g, '<em class="italic">$1</em>');
     
     // Links
     html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" class="text-blue-600 hover:underline" target="_blank" rel="noopener noreferrer">$1</a>');
