@@ -1,4 +1,4 @@
-import { eq, desc, count, avg, and, sql, or } from 'drizzle-orm';
+import { eq, desc, count, avg, and, sql, or, type SQL } from 'drizzle-orm';
 import { getDB } from './db.js';
 import type { 
   User, 
@@ -141,13 +141,14 @@ class Storage {
       level: users.level,
       points: users.points,
       profileImageUrl: users.profileImageUrl,
+      googleId: users.googleId,
       lastLoginAt: users.lastLoginAt,
       inactivityThreshold: users.inactivityThreshold,
       notes: users.notes,
       createdAt: users.createdAt,
       updatedAt: users.updatedAt
     }).from(users);
-    return result;
+    return result as Omit<User, 'password'>[];
   }
 
   async getAllUsersWithStats(): Promise<Omit<User, 'password'>[]> {
@@ -278,11 +279,11 @@ class Storage {
     try {
       console.log('💾 Creating craving entry:', cravingData);
       
-      const insertData: InsertCravingEntry = {
+      const insertData = {
         userId: cravingData.userId,
         intensity: cravingData.intensity,
-        triggers: Array.isArray(cravingData.triggers) ? (cravingData.triggers as string[]) : [],
-        emotions: Array.isArray(cravingData.emotions) ? (cravingData.emotions as string[]) : [],
+        triggers: (Array.isArray(cravingData.triggers) ? cravingData.triggers : []) as string[],
+        emotions: (Array.isArray(cravingData.emotions) ? cravingData.emotions : []) as string[],
         notes: cravingData.notes
       };
       
@@ -875,10 +876,7 @@ class Storage {
     try {
       const result = await this.db
         .insert(userEmergencyRoutines)
-        .values({
-          ...routineData,
-          updatedAt: new Date(),
-        })
+        .values(routineData as any)
         .returning();
       return result[0];
     } catch (error) {
@@ -891,10 +889,7 @@ class Storage {
     try {
       const result = await this.db
         .update(userEmergencyRoutines)
-        .set({
-          ...updateData,
-          updatedAt: new Date()
-        })
+        .set({ ...(updateData as any), updatedAt: new Date() })
         .where(eq(userEmergencyRoutines.id, routineId))
         .returning();
       return result[0];
@@ -987,7 +982,7 @@ class Storage {
       const { exercises, blocks, ...sessionInfo } = sessionData;
       
       // Préparer les données de session avec validation
-      const insertData = {
+      const insertData: any = {
         title: sessionInfo.title || 'Sans titre',
         description: sessionInfo.description || '',
         category: sessionInfo.category || 'maintenance',
@@ -1000,8 +995,6 @@ class Storage {
         protocolConfig: sessionInfo.protocolConfig || null,
         isPublic: sessionInfo.isPublic !== undefined ? sessionInfo.isPublic : false,
         imageUrl: sessionInfo.imageUrl || null,
-        warmupVideo: sessionInfo.warmupVideo || null,
-        cooldownNotes: sessionInfo.cooldownNotes || null,
       };
       
       console.log('[DEBUG] Insert data prepared:', insertData);
@@ -1082,7 +1075,7 @@ class Storage {
     try {
       const result = await this.db
         .update(customSessions)
-        .set({ ...updates, updatedAt: new Date() })
+        .set({ ...(updates as any), updatedAt: new Date() })
         .where(eq(customSessions.id, sessionId))
         .returning();
       return result[0] || null;
@@ -1255,7 +1248,7 @@ class Storage {
     try {
       const result = await this.db
         .update(exercises)
-        .set({ ...updates, updatedAt: new Date() })
+        .set({ ...(updates as any), updatedAt: new Date() })
         .where(eq(exercises.id, exerciseId))
         .returning();
       return result[0] || null;
@@ -1273,36 +1266,27 @@ class Storage {
         .select({
           id: favoriteSessions.id,
           userId: favoriteSessions.userId,
-          sessionId: favoriteSessions.sessionId,
-          customName: favoriteSessions.customName,
-          customizedData: favoriteSessions.customizedData,
+          sourceSessionId: favoriteSessions.sourceSessionId,
+          title: favoriteSessions.title,
+          description: favoriteSessions.description,
+          category: favoriteSessions.category,
+          protocol: favoriteSessions.protocol,
+          totalDuration: favoriteSessions.totalDuration,
+          difficulty: favoriteSessions.difficulty,
+          exercises: favoriteSessions.exercises,
+          tags: favoriteSessions.tags,
+          imageUrl: favoriteSessions.imageUrl,
           createdAt: favoriteSessions.createdAt,
-          session: customSessions
+          updatedAt: favoriteSessions.updatedAt,
         })
         .from(favoriteSessions)
-        .leftJoin(customSessions, eq(favoriteSessions.sessionId, customSessions.id))
         .where(eq(favoriteSessions.userId, userId))
         .orderBy(desc(favoriteSessions.createdAt));
 
-      // Retourner les données avec customizedData si disponible, sinon session originale
-      return favorites.map(fav => {
-        if (fav.customizedData) {
-          return {
-            ...fav.customizedData,
-            id: fav.id,
-            title: fav.customName || fav.customizedData.title || fav.session?.title,
-            isFavorite: true,
-            customizedFrom: fav.sessionId
-          };
-        }
-        return {
-          ...fav.session,
-          id: fav.id,
-          title: fav.customName || fav.session?.title,
-          isFavorite: true,
-          customizedFrom: fav.sessionId
-        };
-      });
+      return favorites.map(fav => ({
+        ...fav,
+        isFavorite: true,
+      }));
     } catch (error) {
       console.error('Error fetching favorite sessions:', error);
       throw error;
@@ -1311,21 +1295,34 @@ class Storage {
 
   async addFavoriteSession(data: {
     userId: string;
-    sessionId: string;
-    customName?: string;
-    customizedData?: any;
+    sessionId?: string;
+    title: string;
+    description?: string;
+    category: string;
+    protocol?: string;
+    totalDuration?: number;
+    difficulty?: string;
+    exercises: any[];
+    tags?: string[];
+    imageUrl?: string;
   }): Promise<any> {
     try {
+      const insertData: any = {
+        userId: data.userId,
+        sourceSessionId: data.sessionId || null,
+        title: data.title,
+        description: data.description || null,
+        category: data.category,
+        protocol: data.protocol || 'standard',
+        totalDuration: data.totalDuration || 0,
+        difficulty: data.difficulty || 'beginner',
+        exercises: data.exercises || [],
+        tags: data.tags || [],
+        imageUrl: data.imageUrl || null,
+      };
       const result = await this.db
         .insert(favoriteSessions)
-        .values({
-          id: crypto.randomUUID(),
-          userId: data.userId,
-          sessionId: data.sessionId,
-          customName: data.customName,
-          customizedData: data.customizedData,
-          createdAt: new Date()
-        })
+        .values(insertData)
         .returning();
 
       return result[0];
@@ -1344,7 +1341,7 @@ class Storage {
         .where(eq(favoriteSessions.id, favoriteId))
         .limit(1);
 
-      if (!existing[0] || existing[0].userId !== userId) {
+      if (!existing[0] || (existing[0] as any).userId !== userId) {
         return false;
       }
 
@@ -1443,8 +1440,6 @@ class Storage {
     offset?: number;
   } = {}) {
     try {
-      let query = this.db.select().from(educationalContents);
-      
       const conditions: any[] = [eq(educationalContents.isActive, true)];
       
       if (filters.categoryId) {
@@ -1472,22 +1467,23 @@ class Storage {
           sql`(${educationalContents.title} ILIKE ${`%${filters.search}%`} OR ${educationalContents.description} ILIKE ${`%${filters.search}%`})`
         );
       }
-      
-      if (conditions.length > 0) {
-        query = query.where(and(...conditions));
+
+      const baseQuery = this.db
+        .select()
+        .from(educationalContents)
+        .where(and(...conditions))
+        .orderBy(desc(educationalContents.createdAt))
+        .$dynamic();
+
+      if (filters.limit && filters.offset) {
+        return await baseQuery.limit(filters.limit).offset(filters.offset);
+      } else if (filters.limit) {
+        return await baseQuery.limit(filters.limit);
+      } else if (filters.offset) {
+        return await baseQuery.offset(filters.offset);
       }
       
-      query = query.orderBy(desc(educationalContents.createdAt));
-      
-      if (filters.limit) {
-        query = query.limit(filters.limit);
-      }
-      
-      if (filters.offset) {
-        query = query.offset(filters.offset);
-      }
-      
-      return await query;
+      return await baseQuery;
     } catch (error) {
       console.error('Error fetching educational contents:', error);
       throw error;
@@ -1521,7 +1517,7 @@ class Storage {
 
   async createEducationalContent(data: InsertEducationalContent): Promise<EducationalContent> {
     try {
-      const result = await this.db.insert(educationalContents).values(data).returning();
+      const result = await this.db.insert(educationalContents).values(data as any).returning();
       return result[0];
     } catch (error) {
       console.error('Error creating educational content:', error);
@@ -1544,14 +1540,14 @@ class Storage {
       }
 
       // Fusionner les données sans écraser les champs non fournis
-      const updateData = {
+      const updateData: any = {
         ...data,
         updatedAt: new Date()
       };
 
       // S'assurer que les tags sont correctement formattés
       if (updateData.tags && Array.isArray(updateData.tags)) {
-        updateData.tags = updateData.tags.filter((tag: string) => tag && tag.trim().length > 0);
+        updateData.tags = (updateData.tags as string[]).filter((tag: string) => tag && tag.trim().length > 0);
       }
 
       const result = await this.db
@@ -1686,21 +1682,18 @@ class Storage {
 
   async getUserContentInteractions(userId: string, interactionType?: string) {
     try {
-      let query = this.db
-        .select()
-        .from(contentInteractions)
-        .where(eq(contentInteractions.userId, userId));
-      
-      if (interactionType) {
-        query = query.where(
-          and(
+      const whereClause = interactionType
+        ? and(
             eq(contentInteractions.userId, userId),
             eq(contentInteractions.interactionType, interactionType)
           )
-        );
-      }
-      
-      return await query.orderBy(desc(contentInteractions.createdAt));
+        : eq(contentInteractions.userId, userId);
+
+      return await this.db
+        .select()
+        .from(contentInteractions)
+        .where(whereClause)
+        .orderBy(desc(contentInteractions.createdAt));
     } catch (error) {
       console.error('Error fetching user content interactions:', error);
       throw error;
@@ -1777,12 +1770,17 @@ class Storage {
       const [recentSessionsResult] = await this.db
         .select({ count: count() })
         .from(exerciseSessions)
-        .where(sql`${exerciseSessions.completedAt} >= ${oneWeekAgo.toISOString()}`);
+        .where(
+          and(
+            eq(exerciseSessions.completed, true),
+            sql`${exerciseSessions.createdAt} >= ${oneWeekAgo.toISOString()}`
+          )
+        );
 
       const [recentCravingsResult] = await this.db
         .select({ count: count() })
         .from(cravingEntries)
-        .where(sql`${cravingEntries.timestamp} >= ${oneWeekAgo.toISOString()}`);
+        .where(sql`${cravingEntries.createdAt} >= ${oneWeekAgo.toISOString()}`);
 
       return {
         totalPatients: totalPatientsResult?.count || 0,
