@@ -1038,17 +1038,34 @@ export function registerRoutes(app: Application) {
   app.post('/api/patient-sessions/favorites', requireAuth, async (req, res) => {
     try {
       const userId = req.session.user!.id;
-      const { sessionId, customName, customizedData } = req.body;
+      const { sessionId, customName, customizedData, title, category, description, exercises, protocol, totalDuration, difficulty, tags, imageUrl } = req.body;
 
-      if (!sessionId) {
-        return res.status(400).json({ message: 'Session ID requis' });
+      if (!sessionId && !title) {
+        return res.status(400).json({ message: 'Session ID ou titre requis' });
+      }
+
+      // Si sessionId fourni, récupérer la session source pour obtenir ses données
+      let sessionData: any = null;
+      if (sessionId) {
+        const sessions = await storage.getSessions({
+          userId,
+          userRole: req.session.user!.role || 'patient',
+        });
+        sessionData = sessions.find((s: any) => s.id === sessionId);
       }
 
       const favoriteSession = await storage.addFavoriteSession({
         userId,
         sessionId,
-        customName,
-        customizedData
+        title: customName || title || sessionData?.title || 'Séance favorite',
+        description: description || sessionData?.description,
+        category: category || sessionData?.category || 'maintenance',
+        protocol: protocol || sessionData?.protocol,
+        totalDuration: totalDuration || sessionData?.totalDuration,
+        difficulty: difficulty || sessionData?.difficulty,
+        exercises: exercises || sessionData?.exercises || [],
+        tags: tags || sessionData?.tags,
+        imageUrl: imageUrl || sessionData?.imageUrl,
       });
 
       res.json(favoriteSession);
