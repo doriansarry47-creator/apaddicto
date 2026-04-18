@@ -4,6 +4,7 @@ import express from 'express';
 import session from 'express-session';
 import cors from 'cors';
 import { registerRoutes } from '../server/routes.js';
+import { registerGoogleAuthRoutes } from '../server/google-auth.js';
 import '../server/migrate.js';
 import { debugTablesRouter } from '../server/debugTables.js';
 import { vercelSessionMiddleware } from '../server/vercel-session.js';
