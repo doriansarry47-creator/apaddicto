@@ -155,6 +155,34 @@ async function ensureUsersUpdates() {
   }
 }
 
+async function ensureSessionTable() {
+  const client = new Client({
+    connectionString: process.env.DATABASE_URL
+  });
+
+  try {
+    await client.connect();
+    console.log('🔧 Vérification de la table session pour express-session...');
+    
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS "session" (
+        "sid" varchar NOT NULL COLLATE "default",
+        "sess" json NOT NULL,
+        "expire" timestamp(6) NOT NULL,
+        CONSTRAINT "session_pkey" PRIMARY KEY ("sid")
+      ) WITH (OIDS=FALSE);
+      
+      CREATE INDEX IF NOT EXISTS "IDX_session_expire" ON "session" ("expire");
+    `);
+    
+    console.log('✅ Table session vérifiée/créée');
+  } catch (error) {
+    console.error('❌ Erreur lors de la création de la table session:', error);
+  } finally {
+    await client.end();
+  }
+}
+
 async function ensureGoogleAuthColumn() {
   const client = new Client({
     connectionString: process.env.DATABASE_URL
@@ -216,6 +244,9 @@ async function run() {
     
     // Ajouter le support Google OAuth
     await ensureGoogleAuthColumn();
+
+    // S'assurer que la table session existe pour express-session
+    await ensureSessionTable();
     
   } catch (e) {
     console.error('❌ Erreur migrations:', e);
