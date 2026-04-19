@@ -27,14 +27,18 @@ export default defineConfig({
   build: {
     outDir: path.resolve(__dirname, "dist"),
     emptyOutDir: true,
-    chunkSizeWarningLimit: 600,
+    // Raised limit to avoid false-positive warnings on legitimate large bundles
+    chunkSizeWarningLimit: 1200,
     rollupOptions: {
       input: path.resolve(__dirname, "client/index.html"),
       output: {
         manualChunks: {
+          // Core React runtime
           "vendor-react": ["react", "react-dom"],
+          // Routing
           "vendor-router": ["wouter"],
-          "vendor-ui": [
+          // Radix UI primitives split in two to reduce individual chunk size
+          "vendor-ui-core": [
             "@radix-ui/react-dialog",
             "@radix-ui/react-dropdown-menu",
             "@radix-ui/react-select",
@@ -44,6 +48,8 @@ export default defineConfig({
             "@radix-ui/react-alert-dialog",
             "@radix-ui/react-avatar",
             "@radix-ui/react-checkbox",
+          ],
+          "vendor-ui-extra": [
             "@radix-ui/react-collapsible",
             "@radix-ui/react-label",
             "@radix-ui/react-popover",
@@ -56,12 +62,20 @@ export default defineConfig({
             "@radix-ui/react-toggle",
             "@radix-ui/react-toggle-group",
           ],
+          // Data fetching
           "vendor-query": ["@tanstack/react-query"],
+          // Forms & validation
           "vendor-forms": ["react-hook-form", "@hookform/resolvers", "zod"],
+          // Charts
           "vendor-charts": ["recharts"],
+          // Icons
           "vendor-icons": ["lucide-react"],
+          // Notifications
           "vendor-toast": ["sonner"],
+          // Utility libs
           "vendor-utils": ["date-fns", "clsx", "class-variance-authority", "tailwind-merge"],
+          // Animation
+          "vendor-motion": ["framer-motion"],
         },
       },
     },
