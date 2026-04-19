@@ -1,12 +1,34 @@
-import { Application } from 'express';
+import { Application, Request } from 'express';
 import passport from 'passport';
 import { Strategy as GoogleStrategy } from 'passport-google-oauth20';
 import { storage } from './storage.js';
 
+/**
+ * Détermine l'URL de base de l'application de façon dynamique.
+ * Priorité : variable d'env BASE_URL > en-têtes de la requête > localhost
+ */
+function getBaseUrl(req?: Request): string {
+  // 1. Variable d'environnement explicite (configurée dans Vercel dashboard)
+  if (process.env.BASE_URL && !process.env.BASE_URL.includes('localhost')) {
+    return process.env.BASE_URL;
+  }
+
+  // 2. Déduction depuis la requête entrante (fonctionne sur tous les domaines Vercel)
+  if (req) {
+    const proto = req.headers['x-forwarded-proto'] || req.protocol || 'https';
+    const host = req.headers['x-forwarded-host'] || req.headers.host || '';
+    if (host) {
+      return `${proto}://${host}`;
+    }
+  }
+
+  // 3. Fallback développement local
+  return process.env.BASE_URL || 'http://localhost:5000';
+}
+
 export function registerGoogleAuthRoutes(app: Application) {
   const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
   const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET;
-  const BASE_URL = process.env.BASE_URL || 'http://localhost:5000';
 
   // If Google credentials not configured, skip
   if (!GOOGLE_CLIENT_ID || !GOOGLE_CLIENT_SECRET) {
@@ -22,13 +44,16 @@ export function registerGoogleAuthRoutes(app: Application) {
     return;
   }
 
-  // Configure Passport Google Strategy
+  // Configure Passport Google Strategy with dynamic callbackURL
   passport.use(
     new GoogleStrategy(
       {
         clientID: GOOGLE_CLIENT_ID,
         clientSecret: GOOGLE_CLIENT_SECRET,
-        callbackURL: `${BASE_URL}/api/auth/google/callback`,
+        // callbackURL dynamique : lu depuis la requête au moment de l'auth
+        callbackURL: '/api/auth/google/callback',
+        // Permet à passport-google de construire l'URL complète depuis la requête
+        proxy: true,
         scope: ['profile', 'email'],
       },
       async (_accessToken, _refreshToken, profile, done) => {
